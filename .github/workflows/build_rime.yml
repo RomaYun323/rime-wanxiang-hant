@@ -15,7 +15,7 @@ jobs:
       - name: Install OpenCC
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang，排除 md/json/docs/mkdocs.yml，並且在 custom 資料夾中只保留指定的 4 個檔案
+      # 需求 1: 取得 rime-wanxiang，排除 md/json/docs/mkdocs.yml，並且在 custom 資料夾中只保留指定的 4 個 yaml 檔案與 2 張圖片
       - name: 1. Clone rime-wanxiang base
         run: |
           git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
@@ -27,14 +27,14 @@ jobs:
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
           
-          # 2. 如果 custom 資料夾存在，只保留你指定的 6 個檔案，其餘全部刪除
+          # 2. 如果 custom 資料夾存在，只保留指定的檔案，其餘全部刪除
           if [ -d "/tmp/rime-wanxiang/custom" ]; then
             find /tmp/rime-wanxiang/custom -type f ! \( \
               -name "wanxiang.custom.yaml" -o \
               -name "wanxiang_english.custom.yaml" -o \
               -name "wanxiang_mixedcode.custom.yaml" -o \
-              -name "wanxiang_reverse.custom.yaml" \
-              -name "万象键位映射.jpg" \
+              -name "wanxiang_reverse.custom.yaml" -o \
+              -name "万象键位映射.jpg" -o \
               -name "赞赏.jpg" \
             \) -delete
           fi
