@@ -62,14 +62,17 @@ jobs:
           mv TSCharacters.txt lua/data/
           mv TSPhrases.txt lua/data/
 
-      # 需求 5: 合併 TWVariants.txt
+      # 需求 5: 合併 TWVariants.txt 並自動刪除重複行
       - name: 5. Merge TWVariants.txt
         run: |
           CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
           TARGET_VARIANTS="lua/data/TWVariants.txt"
           if [ -f "$CUSTOM_VARIANTS" ] && [ -f "$TARGET_VARIANTS" ]; then
-            sed -i 's/\r//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
-            awk 'FNR==NR { seen[$0]=1; next } !($0 in seen) { print $0 }' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" >> "$TARGET_VARIANTS"
+            sed -i 's/\r//g' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
+            
+            # 依序讀取目標檔與自訂檔，利用 seen 陣列過濾完全重複的行
+            awk '!seen[$0]++' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" > /tmp/TWVariants_merged.txt
+            mv /tmp/TWVariants_merged.txt "$TARGET_VARIANTS"
           fi
 
       # 需求 6: s2t 簡轉繁轉換
