@@ -62,8 +62,8 @@ jobs:
           mv TSCharacters.txt lua/data/
           mv TSPhrases.txt lua/data/
 
-      # 需求 5: 移除 TWVariants.txt 中與 修改TWVariants.txt 重複的行，再進行合併
-      - name: 5. Merge and Deduplicate TWVariants.txt
+      # 需求 5: 對齊本地 PowerShell 邏輯，合併並移除重複出現的行（僅保留不重複的唯一行）
+      - name: 5. Merge and Unique TWVariants.txt (PowerShell logic equivalent)
         run: |
           CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
           TARGET_VARIANTS="lua/data/TWVariants.txt"
@@ -73,15 +73,31 @@ jobs:
             sed -i 's/\r//g' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
             sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
             
-            # 2. 核心邏輯：從 TARGET 中刪除所有存在於 CUSTOM 的行
-            # grep -vxf 會比對兩個檔案，把與 CUSTOM 相同的行從 TARGET 中剔除
-            grep -vxf "$CUSTOM_VARIANTS" "$TARGET_VARIANTS" > /tmp/TWVariants_filtered.txt
+            # 2. 對齊 PowerShell 的 $combined | Where-Object { $_ -and $_.Trim() -ne '' } | Group-Object | Where-Object { $_.Count -eq 1 }
+            # awk 會統計每一行出現的次數 (count)，最後只印出出現次數剛好等於 1 的行
+            awk '
+              NF {
+                # 去除前後空白並存入陣列計算次數
+                gsub(/^[ \t]+|[ \t]+$/, "", $0);
+                if ($0 != "") {
+                  count[$0]++;
+                  # 記錄第一次出現的順序，保持檔案原本的排序
+                  if (count[$0] == 1) {
+                    lines[++n] = $0;
+                  }
+                }
+              }
+              END {
+                for (i = 1; i <= n; i++) {
+                  if (count[lines[i]] == 1) {
+                    print lines[i];
+                  }
+                }
+              }
+            ' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" > /tmp/TWVariants_unique.txt
             
-            # 3. 將過濾後的 TARGET 與 CUSTOM 重新組合（確保自訂檔的內容生效）
-            cat /tmp/TWVariants_filtered.txt "$CUSTOM_VARIANTS" > "$TARGET_VARIANTS"
-            
-            # 4. 清理暫存檔
-            rm -f /tmp/TWVariants_filtered.txt
+            # 3. 覆蓋回目標檔案
+            mv /tmp/TWVariants_unique.txt "$TARGET_VARIANTS"
           fi
 
       # 需求 6: s2t 簡轉繁轉換
