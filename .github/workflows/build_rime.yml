@@ -15,14 +15,22 @@ jobs:
       - name: Install OpenCC
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang 並排除不需要的檔案 (原本順暢的做法)
+      # 需求 1: 取得 rime-wanxiang，排除多餘檔案與 custom，但保留指定的 4 個檔案
       - name: 1. Clone rime-wanxiang base
         run: |
           git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
           rm -rf /tmp/rime-wanxiang/.git
           find /tmp/rime-wanxiang -type f -name "*.md" -delete
           find /tmp/rime-wanxiang -type f -name "*.json" -delete
-          find /tmp/rime-wanxiang -iname "*custom*" -exec rm -rf {} + || true
+          
+          # 刪除所有 custom 相關項目，但排除保留這四個特定的檔案
+          find /tmp/rime-wanxiang -iname "*custom*" \
+            ! -name "wanxiang.custom.yaml" \
+            ! -name "wanxiang_english.custom.yaml" \
+            ! -name "wanxiang_mixedcode.custom.yaml" \
+            ! -name "wanxiang_reverse.custom.yaml" \
+            -exec rm -rf {} + || true
+            
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
           cp -r /tmp/rime-wanxiang/* ./
