@@ -132,14 +132,15 @@ jobs:
             sed -i '/^\.\.\.$/i \  - contacts' "$WANXIANG_DICT"
           fi
 
-      # 需求 8: 打包成 rime-wanxiang-base.zip (排除 402MB 的大模型檔案)
+      # 需求 8: 打包成 rime-wanxiang-base.zip (排除大模型與 LICENSE)
       - name: 8. Package to rime-wanxiang-base.zip
         run: |
           zip -r rime-wanxiang-base.zip . \
             -x ".git*" \
             -x ".github*" \
             -x "custom_configs*" \
-            -x "wanxiang-lts-zh-hant.gram"
+            -x "wanxiang-lts-zh-hant.gram" \
+            -x "*LICENSE*"
 
       # 需求 9: 提交並推送 (用原本順暢、不會卡的寫法)
       - name: 9. Commit and Push Source Code
