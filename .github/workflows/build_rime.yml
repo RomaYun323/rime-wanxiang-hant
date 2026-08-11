@@ -1,0 +1,133 @@
+name: Build wanxiang-base-hant
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenCC
+        run: sudo apt-get update && sudo apt-get install -y opencc
+
+      # 需求 1: 取得 rime-wanxiang 並排除不需要的檔案 (原本順暢的做法)
+      - name: 1. Clone rime-wanxiang base
+        run: |
+          git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
+          rm -rf /tmp/rime-wanxiang/.git
+          find /tmp/rime-wanxiang -type f -name "*.md" -delete
+          find /tmp/rime-wanxiang -type f -name "*.json" -delete
+          find /tmp/rime-wanxiang -iname "*custom*" -exec rm -rf {} + || true
+          rm -rf /tmp/rime-wanxiang/docs
+          rm -f /tmp/rime-wanxiang/mkdocs.yml
+          cp -r /tmp/rime-wanxiang/* ./
+
+      # 需求 2: 取得 RIME-LMDG 詞庫（不再下載 402MB 的大模型）
+      - name: 2. Get RIME-LMDG Dicts
+        run: |
+          git clone --depth 1 https://github.com/amzxyz/RIME-LMDG.git /tmp/RIME-LMDG
+          
+      # 需求 3: 修改 zi.dict.yaml (無空白行) 並替換 dicts
+      - name: 3. Modify zi.dict.yaml and Replace dicts
+        run: |
+          FILE_PATH="custom_configs/zi.dict.新增部分.yaml"
+          if [ -f "$FILE_PATH" ]; then
+            [ -s "/tmp/RIME-LMDG/dicts_hant/zi.dict.yaml" ] && echo "" >> /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+            cat "$FILE_PATH" >> /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+          fi
+          if [ -f "/tmp/RIME-LMDG/dicts_hant/zi.dict.yaml" ]; then
+            grep -v '^[[:space:]]*$' /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml > /tmp/zi_clean.yaml
+            mv /tmp/zi_clean.yaml /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+          fi
+          rm -rf ./dicts
+          cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
+
+      # 需求 4: 處理 OpenCC Dicts (產出文字 \t)
+      - name: 4. Process OpenCC Dicts
+        run: |
+          curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSCharacters.txt -o TSCharacters.txt
+          curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
+          sed -i '/^#/d' TSPhrases.txt
+          sed -i '/^#/d' TSCharacters.txt
+          sed -i 's/ /\\t/g' TSPhrases.txt
+          sed -i 's/ /\\t/g' TSCharacters.txt
+          grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
+          grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
+          mkdir -p lua/data/
+          mv TSCharacters.txt lua/data/
+          mv TSPhrases.txt lua/data/
+
+      # 需求 5: 合併 TWVariants.txt
+      - name: 5. Merge TWVariants.txt
+        run: |
+          CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
+          TARGET_VARIANTS="lua/data/TWVariants.txt"
+          if [ -f "$CUSTOM_VARIANTS" ] && [ -f "$TARGET_VARIANTS" ]; then
+            sed -i 's/\r//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
+            awk 'FNR==NR { seen[$0]=1; next } !($0 in seen) { print $0 }' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" >> "$TARGET_VARIANTS"
+          fi
+
+      # 需求 6: s2t 簡轉繁轉換
+      - name: 6. Convert Specific Files to Traditional
+        run: |
+          FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt" "lua/wanxiang/number_translator.lua" "lua/wanxiang/shijian.lua")
+          for file in "${FILES[@]}"; do
+            if [ -f "$file" ]; then
+              opencc -i "$file" -o "${file}.tmp" -c s2t.json
+              mv "${file}.tmp" "$file"
+            fi
+          done
+
+      # 需求 7: wanxiang.dict.yaml 新增 contacts
+      - name: 7. Append Contacts
+        run: |
+          WANXIANG_DICT="wanxiang.dict.yaml"
+          if [ -f "$WANXIANG_DICT" ]; then
+            sed -i '/^\.\.\.$/i \  - contacts' "$WANXIANG_DICT"
+          fi
+
+      # 需求 8: 打包成 rime-wanxiang-base.zip (排除 402MB 的大模型檔案)
+      - name: 8. Package to rime-wanxiang-base.zip
+        run: |
+          zip -r rime-wanxiang-base.zip . \
+            -x ".git*" \
+            -x ".github*" \
+            -x "custom_configs*" \
+            -x "wanxiang-lts-zh-hant.gram"
+
+      # 需求 9: 提交並推送 (用原本順暢、不會卡的寫法)
+      - name: 9. Commit and Push Source Code
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "wanxiang-lts-zh-hant.gram" >> .gitignore
+          echo "rime-wanxiang-base.zip" >> .gitignore
+          git add .
+          git commit -m "build: auto generate hant workspace" || echo "No changes"
+          git push origin main
+
+      # 需求 10: 發布 Release（僅打包並上傳 rime-wanxiang-base.zip，大模型指向官方 Release）
+      - name: 10. Upload to Release
+        run: |
+          VERSION=$(cat version.txt)
+          echo "RELEASE_VERSION=v$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TITLE=v$VERSION Rime万象拼音输入方案-繁體詞庫" >> $GITHUB_ENV
+        
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: ${{ env.RELEASE_TITLE }}
+          body: |
+            自動編譯同步的客製化繁體 RIME 環境包。
+            
+            📥 **繁體模型 (wanxiang-lts-zh-hant.gram) 請直接至官方 Release 下載**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+          files: |
+            rime-wanxiang-base.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
