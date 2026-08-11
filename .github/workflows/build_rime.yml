@@ -62,16 +62,22 @@ jobs:
           mv TSCharacters.txt lua/data/
           mv TSPhrases.txt lua/data/
 
-      # 需求 5: 合併 TWVariants.txt 並自動刪除重複行
+      # 需求 5: 徹底清理空白、統一格式並合併 TWVariants.txt 進行去重
       - name: 5. Merge TWVariants.txt
         run: |
           CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
           TARGET_VARIANTS="lua/data/TWVariants.txt"
           if [ -f "$CUSTOM_VARIANTS" ] && [ -f "$TARGET_VARIANTS" ]; then
+            # 1. 移除 Windows 換行符 (\r)
             sed -i 's/\r//g' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
             
-            # 依序讀取目標檔與自訂檔，利用 seen 陣列過濾完全重複的行
+            # 2. 清除每一行開頭與結尾所有可能的隱藏空白、Tab
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
+            
+            # 3. 合併並嚴格去重（只保留第一次出現的行）
             awk '!seen[$0]++' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" > /tmp/TWVariants_merged.txt
+            
+            # 4. 覆蓋回目標檔案
             mv /tmp/TWVariants_merged.txt "$TARGET_VARIANTS"
           fi
 
