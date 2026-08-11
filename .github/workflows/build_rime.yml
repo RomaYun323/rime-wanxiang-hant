@@ -15,7 +15,7 @@ jobs:
       - name: Install OpenCC
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang，排除 md/json/docs/mkdocs.yml，並且在 custom 資料夾中只保留指定的 4 個 yaml 檔案與 2 張圖片
+      # 需求 1: 取得 rime-wanxiang，排除 md/json/docs/mkdocs.yml、指定的 custom 檔案，並刪除指定的 ST 檔案
       - name: 1. Clone rime-wanxiang base
         run: |
           git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
@@ -27,7 +27,10 @@ jobs:
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
           
-          # 2. 如果 custom 資料夾存在，只保留指定的檔案，其餘全部刪除
+          # 2. 刪除指定的 lua/data/ ST 檔案（如果存在的話）
+          rm -f /tmp/rime-wanxiang/lua/data/STCharacters.txt /tmp/rime-wanxiang/lua/data/STPhrases.txt
+          
+          # 3. 如果 custom 資料夾存在，只保留指定的檔案，其餘全部刪除
           if [ -d "/tmp/rime-wanxiang/custom" ]; then
             find /tmp/rime-wanxiang/custom -type f ! \( \
               -name "wanxiang.custom.yaml" -o \
@@ -39,7 +42,7 @@ jobs:
             \) -delete
           fi
           
-          # 3. 將整理好的檔案複製到專案根目錄
+          # 4. 將整理好的檔案複製到專案根目錄
           cp -r /tmp/rime-wanxiang/* ./
 
       # 需求 2: 取得 RIME-LMDG 詞庫（不再下載 402MB 的大模型）
