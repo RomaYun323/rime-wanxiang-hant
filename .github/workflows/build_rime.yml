@@ -138,7 +138,7 @@ jobs:
             sed -i '/^\.\.\.$/i \  - contacts' "$WANXIANG_DICT"
           fi
 
-      # 需求 8: 打包成兩種版本 (1. 不含大模型的基礎包, 2. 包含大模型的完整包)
+      # 需求 8: 打包成兩種版本 (相互獨立，避免互相包進去)
       - name: 8. Package to ZIPs
         run: |
           # 1. 打包不含大模型的基礎包
@@ -147,14 +147,16 @@ jobs:
             -x ".github*" \
             -x "custom_configs*" \
             -x "wanxiang-lts-zh-hant.gram" \
+            -x "rime-wanxiang-full.zip" \
             -x "*LICENSE*"
             
-          # 2. 打包包含大模型的完整包 (將 wanxiang-lts-zh-hant.gram 暫時納入或直接打包)
+          # 2. 打包包含大模型的完整包 (排除 base 壓縮檔與大模型本身)
           if [ -f "wanxiang-lts-zh-hant.gram" ]; then
             zip -r rime-wanxiang-full.zip . \
               -x ".git*" \
               -x ".github*" \
               -x "custom_configs*" \
+              -x "rime-wanxiang-base.zip" \
               -x "*LICENSE*"
           else
             echo "警告：找不到大模型檔案，無法產生完整包"
