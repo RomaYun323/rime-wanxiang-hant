@@ -1,2 +1,2 @@
-# rime-wanxiang-----
-方案屬於原作者https://github.com/amzxyz
+# rime-wanxiang-自用繁體方案
+方案原作者https://github.com/amzxyz
