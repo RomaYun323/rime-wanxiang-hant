@@ -45,10 +45,11 @@ jobs:
           # 4. 將整理好的檔案複製到專案根目錄
           cp -r /tmp/rime-wanxiang/* ./
 
-      # 需求 2: 取得 RIME-LMDG 詞庫（不再下載 402MB 的大模型）
-      - name: 2. Get RIME-LMDG Dicts
+      # 需求 2: 取得 RIME-LMDG 詞庫（並下載大模型用於製作完整包）
+      - name: 2. Get RIME-LMDG Dicts and Gram
         run: |
           git clone --depth 1 https://github.com/amzxyz/RIME-LMDG.git /tmp/RIME-LMDG
+          curl -sL -f -o wanxiang-lts-zh-hant.gram "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram" || echo "警告：模型檔案下載失敗"
           
       # 需求 3: 修改 zi.dict.yaml (無空白行) 並替換 dicts
       - name: 3. Modify zi.dict.yaml and Replace dicts
@@ -137,15 +138,27 @@ jobs:
             sed -i '/^\.\.\.$/i \  - contacts' "$WANXIANG_DICT"
           fi
 
-      # 需求 8: 打包成 rime-wanxiang-base.zip (排除大模型與 LICENSE)
-      - name: 8. Package to rime-wanxiang-base.zip
+      # 需求 8: 打包成兩種版本 (1. 不含大模型的基礎包, 2. 包含大模型的完整包)
+      - name: 8. Package to ZIPs
         run: |
+          # 1. 打包不含大模型的基礎包
           zip -r rime-wanxiang-base.zip . \
             -x ".git*" \
             -x ".github*" \
             -x "custom_configs*" \
             -x "wanxiang-lts-zh-hant.gram" \
             -x "*LICENSE*"
+            
+          # 2. 打包包含大模型的完整包 (將 wanxiang-lts-zh-hant.gram 暫時納入或直接打包)
+          if [ -f "wanxiang-lts-zh-hant.gram" ]; then
+            zip -r rime-wanxiang-full.zip . \
+              -x ".git*" \
+              -x ".github*" \
+              -x "custom_configs*" \
+              -x "*LICENSE*"
+          else
+            echo "警告：找不到大模型檔案，無法產生完整包"
+          fi
 
       # 需求 9: 提交並推送 (避免重複寫入 .gitignore)
       - name: 9. Commit and Push Source Code
@@ -153,15 +166,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 檢查並確保 .gitignore 裡只寫一次，不會重複堆疊
           grep -qxF "wanxiang-lts-zh-hant.gram" .gitignore || echo "wanxiang-lts-zh-hant.gram" >> .gitignore
           grep -qxF "rime-wanxiang-base.zip" .gitignore || echo "rime-wanxiang-base.zip" >> .gitignore
+          grep -qxF "rime-wanxiang-full.zip" .gitignore || echo "rime-wanxiang-full.zip" >> .gitignore
           
           git add .
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
 
-      # 需求 10: 發布 Release（僅打包並上傳 rime-wanxiang-base.zip，大模型指向官方 Release）
+      # 需求 10: 發布 Release（同時上傳兩種 zip 壓縮包）
       - name: 10. Upload to Release
         run: |
           VERSION=$(cat version.txt)
@@ -175,9 +188,12 @@ jobs:
           name: ${{ env.RELEASE_TITLE }}
           body: |
             自動編譯同步的客製化繁體 RIME 環境包。
-            
             📥 **繁體模型 (wanxiang-lts-zh-hant.gram) 請直接至官方 Release 下載**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+            📦 **兩種版本供選擇**：
+            1. `rime-wanxiang-base.zip`：**不含大模型**（體積小，適合快速下載更新）。
+            2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**（一包到位，但體積較大）。
           files: |
             rime-wanxiang-base.zip
+            rime-wanxiang-full.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
