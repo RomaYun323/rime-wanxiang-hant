@@ -27,13 +27,15 @@ jobs:
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
           
-          # 2. 如果 custom 資料夾存在，只保留你指定的 4 個檔案，其餘全部刪除
+          # 2. 如果 custom 資料夾存在，只保留你指定的 6 個檔案，其餘全部刪除
           if [ -d "/tmp/rime-wanxiang/custom" ]; then
             find /tmp/rime-wanxiang/custom -type f ! \( \
               -name "wanxiang.custom.yaml" -o \
               -name "wanxiang_english.custom.yaml" -o \
               -name "wanxiang_mixedcode.custom.yaml" -o \
               -name "wanxiang_reverse.custom.yaml" \
+              -name "万象键位映射.jpg" \
+              -name "赞赏.jpg" \
             \) -delete
           fi
           
