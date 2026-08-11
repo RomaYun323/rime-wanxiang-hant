@@ -188,10 +188,11 @@ jobs:
           name: ${{ env.RELEASE_TITLE }}
           body: |
             自動編譯同步的客製化繁體 RIME 環境包。
-            📥 **繁體模型 (wanxiang-lts-zh-hant.gram) 請直接至官方 Release 下載**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
             📦 **兩種版本供選擇**：
             1. `rime-wanxiang-base.zip`：**不含大模型**（體積小，適合快速下載更新）。
             2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**（一包到位，但體積較大）。
+            📥 **繁體模型 (wanxiang-lts-zh-hant.gram) 官方 Release **：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+
           files: |
             rime-wanxiang-base.zip
             rime-wanxiang-full.zip
