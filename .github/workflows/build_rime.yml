@@ -142,13 +142,16 @@ jobs:
             -x "wanxiang-lts-zh-hant.gram" \
             -x "*LICENSE*"
 
-      # 需求 9: 提交並推送 (用原本順暢、不會卡的寫法)
+      # 需求 9: 提交並推送 (避免重複寫入 .gitignore)
       - name: 9. Commit and Push Source Code
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "wanxiang-lts-zh-hant.gram" >> .gitignore
-          echo "rime-wanxiang-base.zip" >> .gitignore
+          
+          # 檢查並確保 .gitignore 裡只寫一次，不會重複堆疊
+          grep -qxF "wanxiang-lts-zh-hant.gram" .gitignore || echo "wanxiang-lts-zh-hant.gram" >> .gitignore
+          grep -qxF "rime-wanxiang-base.zip" .gitignore || echo "rime-wanxiang-base.zip" >> .gitignore
+          
           git add .
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
