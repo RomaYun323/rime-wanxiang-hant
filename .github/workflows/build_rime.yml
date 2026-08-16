@@ -2,7 +2,7 @@ name: Build wanxiang-base-hant
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # 每天 UTC 時間 00:00 執行
+    - cron: '*/5 10 * * *' # UTC 10點區間每5分鐘執行 (台灣時間 18:00~18:55)
   workflow_dispatch: {} # 保留手動觸發功能
 
 jobs:
@@ -11,6 +11,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 必須先 Checkout 才能讀取本地的 .last_sha 檔案
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+
       - name: Check for updates
         id: check_update
         run: |
@@ -32,18 +36,13 @@ jobs:
             echo "should_run=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout your repository
-        if: steps.check_update.outputs.should_run == 'true'
-        uses: actions/checkout@v4
-        # ... 後續步驟都要加上 if: steps.check_update.outputs.should_run == 'true'
-      - name: Checkout your repository
-        uses: actions/checkout@v4
-
       - name: Install OpenCC
+        if: steps.check_update.outputs.should_run == 'true'
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang，排除 md/json/docs/mkdocs.yml、指定的 custom 檔案，並刪除指定的 ST 檔案
+      # 需求 1: 取得 rime-wanxiang，排除指定檔案
       - name: 1. Clone rime-wanxiang base
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
           rm -rf /tmp/rime-wanxiang/.git
@@ -54,10 +53,10 @@ jobs:
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
           
-          # 2. 刪除指定的 lua/data/ ST 檔案（如果存在的話）
+          # 2. 刪除指定的 lua/data/ ST 檔案
           rm -f /tmp/rime-wanxiang/lua/data/STCharacters.txt /tmp/rime-wanxiang/lua/data/STPhrases.txt
           
-          # 3. 如果 custom 資料夾存在，只保留指定的檔案，其餘全部刪除
+          # 3. 如果 custom 資料夾存在，只保留指定的檔案
           if [ -d "/tmp/rime-wanxiang/custom" ]; then
             find /tmp/rime-wanxiang/custom -type f ! \( \
               -name "wanxiang.custom.yaml" -o \
@@ -69,17 +68,19 @@ jobs:
             \) -delete
           fi
           
-          # 4. 將整理好的檔案複製到專案根目錄
+          # 4. 複製到專案根目錄
           cp -r /tmp/rime-wanxiang/* ./
 
-      # 需求 2: 取得 RIME-LMDG 詞庫（並下載大模型用於製作完整包）
+      # 需求 2: 取得 RIME-LMDG 詞庫
       - name: 2. Get RIME-LMDG Dicts and Gram
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           git clone --depth 1 https://github.com/amzxyz/RIME-LMDG.git /tmp/RIME-LMDG
           curl -sL -f -o wanxiang-lts-zh-hant.gram "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram" || echo "警告：模型檔案下載失敗"
-          
+
       # 需求 3: 修改 zi.dict.yaml (無空白行) 並替換 dicts
       - name: 3. Modify zi.dict.yaml and Replace dicts
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           FILE_PATH="custom_configs/zi.dict.新增部分.yaml"
           if [ -f "$FILE_PATH" ]; then
@@ -93,8 +94,9 @@ jobs:
           rm -rf ./dicts
           cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
 
-      # 需求 4: 處理 OpenCC Dicts (產出文字 \t)
+      # 需求 4: 處理 OpenCC Dicts
       - name: 4. Process OpenCC Dicts
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSCharacters.txt -o TSCharacters.txt
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
@@ -108,46 +110,36 @@ jobs:
           mv TSCharacters.txt lua/data/
           mv TSPhrases.txt lua/data/
 
-      # 需求 5: 對齊本地 PowerShell 邏輯，合併並移除重複出現的行（僅保留不重複的唯一行）
-      - name: 5. Merge and Unique TWVariants.txt (PowerShell logic equivalent)
+      # 需求 5: 對齊本地 PowerShell 邏輯，合併並移除重複出現的行
+      - name: 5. Merge and Unique TWVariants.txt
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
           TARGET_VARIANTS="lua/data/TWVariants.txt"
           
           if [ -f "$CUSTOM_VARIANTS" ] && [ -f "$TARGET_VARIANTS" ]; then
-            # 1. 統一清除 Windows 換行符與前後空白
             sed -i 's/\r//g' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
             sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
-            
-            # 2. 對齊 PowerShell 的 $combined | Where-Object { $_ -and $_.Trim() -ne '' } | Group-Object | Where-Object { $_.Count -eq 1 }
-            # awk 會統計每一行出現的次數 (count)，最後只印出出現次數剛好等於 1 的行
             awk '
               NF {
-                # 去除前後空白並存入陣列計算次數
                 gsub(/^[ \t]+|[ \t]+$/, "", $0);
                 if ($0 != "") {
                   count[$0]++;
-                  # 記錄第一次出現的順序，保持檔案原本的排序
-                  if (count[$0] == 1) {
-                    lines[++n] = $0;
-                  }
+                  if (count[$0] == 1) { lines[++n] = $0; }
                 }
               }
               END {
                 for (i = 1; i <= n; i++) {
-                  if (count[lines[i]] == 1) {
-                    print lines[i];
-                  }
+                  if (count[lines[i]] == 1) { print lines[i]; }
                 }
               }
             ' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" > /tmp/TWVariants_unique.txt
-            
-            # 3. 覆蓋回目標檔案
             mv /tmp/TWVariants_unique.txt "$TARGET_VARIANTS"
           fi
 
       # 需求 6: s2t 簡轉繁轉換
       - name: 6. Convert Specific Files to Traditional
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt" "lua/wanxiang/number_translator.lua" "lua/wanxiang/shijian.lua")
           for file in "${FILES[@]}"; do
@@ -159,38 +151,32 @@ jobs:
 
       # 需求 7: wanxiang.dict.yaml 新增 contacts
       - name: 7. Append Contacts
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           WANXIANG_DICT="wanxiang.dict.yaml"
           if [ -f "$WANXIANG_DICT" ]; then
             sed -i '/^\.\.\.$/i \  - contacts' "$WANXIANG_DICT"
           fi
 
-      # 需求 8: 打包成兩種版本 (相互獨立，避免互相包進去)
+      # 需求 8: 打包成兩種版本
       - name: 8. Package to ZIPs
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
-          # 1. 打包不含大模型的基礎包
           zip -r rime-wanxiang-base.zip . \
-            -x ".git*" \
-            -x ".github*" \
-            -x "custom_configs*" \
-            -x "wanxiang-lts-zh-hant.gram" \
-            -x "rime-wanxiang-full.zip" \
-            -x "*LICENSE*"
+            -x ".git*" -x ".github*" -x "custom_configs*" \
+            -x "wanxiang-lts-zh-hant.gram" -x "rime-wanxiang-full.zip" -x "*LICENSE*"
             
-          # 2. 打包包含大模型的完整包 (排除 base 壓縮檔與大模型本身)
           if [ -f "wanxiang-lts-zh-hant.gram" ]; then
             zip -r rime-wanxiang-full.zip . \
-              -x ".git*" \
-              -x ".github*" \
-              -x "custom_configs*" \
-              -x "rime-wanxiang-base.zip" \
-              -x "*LICENSE*"
+              -x ".git*" -x ".github*" -x "custom_configs*" \
+              -x "rime-wanxiang-base.zip" -x "*LICENSE*"
           else
             echo "警告：找不到大模型檔案，無法產生完整包"
           fi
 
-      # 需求 9: 提交並推送 (避免重複寫入 .gitignore)
+      # 需求 9: 提交並推送
       - name: 9. Commit and Push Source Code
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -203,25 +189,30 @@ jobs:
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
 
-      # 需求 10: 發布 Release（同時上傳兩種 zip 壓縮包）
-      - name: 10. Upload to Release
+      # 需求 10: 發布 Release
+      - name: 10. Prepare Release Env
+        if: steps.check_update.outputs.should_run == 'true'
         run: |
-          VERSION=$(cat version.txt)
+          if [ -f version.txt ]; then
+            VERSION=$(cat version.txt)
+          else
+            VERSION=$(date +'%Y%m%d%H%M')
+          fi
           echo "RELEASE_VERSION=v$VERSION" >> $GITHUB_ENV
           echo "RELEASE_TITLE=v$VERSION Rime万象拼音输入方案-繁體詞庫" >> $GITHUB_ENV
         
       - name: Release
+        if: steps.check_update.outputs.should_run == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_VERSION }}
           name: ${{ env.RELEASE_TITLE }}
           body: |
             自動編譯同步的客製化繁體 RIME 環境包。
-            📥 **繁體模型 (wanxiang-lts-zh-hant.gram) 官方 Release**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+            📥 **繁體模型官方 Release**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
             📦 **兩種版本供選擇**：
-            1. `rime-wanxiang-base.zip`：**不含大模型**（體積小，適合快速下載更新）。
-            2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**（一包到位，但體積較大）。
-
+            1. `rime-wanxiang-base.zip`：**不含大模型**
+            2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**
           files: |
             rime-wanxiang-base.zip
             rime-wanxiang-full.zip
