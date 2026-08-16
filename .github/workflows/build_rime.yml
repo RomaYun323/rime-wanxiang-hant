@@ -1,7 +1,9 @@
 name: Build wanxiang-base-hant
 
 on:
-  workflow_dispatch: {}
+  schedule:
+    - cron: '0 10 * * *' # 每天 UTC 時間 00:00 執行
+  workflow_dispatch: {} # 保留手動觸發功能
 
 jobs:
   build:
@@ -9,6 +11,31 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check for updates
+        id: check_update
+        run: |
+          # 取得上游最新的 commit SHA
+          UPSTREAM_SHA=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git main | cut -f1)
+          # 取得紀錄在本地的上次檢查 SHA
+          if [ -f .last_sha ]; then
+            LAST_SHA=$(cat .last_sha)
+          else
+            LAST_SHA=""
+          fi
+          
+          if [ "$UPSTREAM_SHA" == "$LAST_SHA" ]; then
+            echo "No updates found."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "Updates found!"
+            echo "$UPSTREAM_SHA" > .last_sha
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout your repository
+        if: steps.check_update.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+        # ... 後續步驟都要加上 if: steps.check_update.outputs.should_run == 'true'
       - name: Checkout your repository
         uses: actions/checkout@v4
 
