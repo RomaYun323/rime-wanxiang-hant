@@ -10,16 +10,6 @@ patch:
     - YmdHMS
     - Y年m月d日 H點M分
     - y/m/d I:M p
-  key_binder/bindings/+:
-    - when: paging
-      accept: comma
-      send: Page_Up
-    - when: has_menu
-      accept: period
-      send: Page_Down
-    - when: has_menu
-      accept: semicolon
-      send: 2
   switches:
     - name: ascii_mode
       states: [中文, 英文]
@@ -58,6 +48,88 @@ patch:
     - name: english
       reset: 1
       states: [英文关, 英文开]
+  key_binder/bindings:
+    - accept: minus
+      send: Page_Up
+      when: has_menu
+    - accept: equal
+      send: Page_Down
+      when: has_menu
+    - accept: Control+Shift+3
+      toggle: ascii_punct
+      when: always
+    - accept: Control+Shift+numbersign
+      toggle: ascii_punct
+      when: always
+    - accept: Control+Shift+4
+      toggle: t2s
+      when: always
+    - accept: Control+Shift+dollar
+      toggle: s2t
+      when: always
+    - accept: Alt+Left
+      send: Shift+Left
+      when: composing
+    - accept: Alt+Right
+      send: Shift+Right
+      when: composing
+    - accept: Control+w
+      send: Control+BackSpace
+      when: composing
+    - accept: Control+e
+      toggle: chinese_english
+      when: has_menu
+    - accept: Control+a
+      toggle: tone_hint
+      when: has_menu
+    - accept: Control+s
+      toggle: tone_display
+      when: has_menu
+    - accept: Control+t
+      toggle: super_tips
+      when: has_menu
+    - accept: Control+g
+      toggle: charset_filter
+      when: has_menu
+    - accept: Control+g
+      toggle: charset_filter
+      when: composing
+    - accept: Shift+space
+      select: .next
+      when: always
+    - accept: Tab
+      send: Control+Right
+      when: has_menu
+    - accept: Tab
+      send: Control+Right
+      when: composing
+    - accept: Control+Tab
+      send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
+      when: composing
+    - accept: /
+      send_sequence: '{space}'
+      match: ^/$
+    - accept: backslash
+      send_sequence: '{Clear}{backslash}'
+      match: ^›+$
+    - accept: comma
+      send_sequence: '{Clear}{comma}'
+      match: ^›+$
+    - accept: period
+      send_sequence: '{Clear}{period}'
+      match: ^›+$
+    - accept: Return
+      send_sequence: '{Clear}{Return}'
+      match: ^›+$
+    - accept: comma
+      send: Page_Up
+      when: paging
+    - accept: period
+      send: Page_Down
+      when: has_menu
+    - accept: semicolon
+      send: '2'
+      when: has_menu
   super_replacer/rules:
     - comment_mode: none
       files:
