@@ -1,0 +1,38 @@
+name: Publish Configs Release
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  release-configs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 直接強制覆寫指定的 Tag 標籤，確保標籤永遠指向最新程式碼
+      - name: Update Tag
+        run: |
+          git tag -f custom-configs
+          git push -f origin custom-configs
+
+      - name: Create or Update Configs Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-configs
+          name: 客製化設定檔與聯絡人詞庫 (持續更新)
+          body: |
+            獨立發布的 RIME 客製化補丁與擴充詞庫。
+            *(此頁面會自動覆蓋更新，永遠提供最新版本)*
+            
+            ⚙️ **點擊下方 Assets 即可一鍵「左鍵下載」：**
+            - `wanxiang.custom.yaml` (自訂補丁設定)
+            - `contacts.dict.yaml` (聯絡人擴充詞庫)
+          files: |
+            custom_configs/wanxiang.custom.yaml
+            custom_configs/contacts.dict.yaml
+          make_latest: false # 🌟重要：設為 false 避免搶走你主環境包的 Latest 綠色標記
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
