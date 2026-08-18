@@ -220,8 +220,7 @@ jobs:
           body: |
             自動編譯同步的客製化繁體 RIME 環境包。
             📥 **繁體模型官方 Release**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
-            ⚙️ **wanxiang.custom下載**：
-            [⬇️ 點此下載 wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_VERSION }}/wanxiang.custom.yaml)
+            ⚙️ **繁體custom補丁下載**：[wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_VERSION }}/wanxiang.custom.yaml)
             📦 **兩種版本供選擇**：
             1. `rime-wanxiang-base.zip`：**不含大模型**
             2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**
