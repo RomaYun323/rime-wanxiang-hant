@@ -109,8 +109,8 @@ jobs:
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
           sed -i '/^#/d' TSPhrases.txt
           sed -i '/^#/d' TSCharacters.txt
-          sed -i 's/ /\t/g' TSPhrases.txt
-          sed -i 's/ /\t/g' TSCharacters.txt
+          sed -i 's/ /\\t/g' TSPhrases.txt
+          sed -i 's/ /\\t/g' TSCharacters.txt
           grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
           grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
           mkdir -p lua/data/
