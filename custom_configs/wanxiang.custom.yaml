@@ -206,14 +206,14 @@ patch:
       blacklist: []
       option: charset_filter
     - addlist: []
-      base: j
+      base: jg
       blacklist: []
       option: t2s
     - addlist: []
-      base: h
+      base: hT
       blacklist: []
       option: t2hk
     - addlist: []
-      base: f
+      base: fT
       blacklist: []
       option: t2tw
