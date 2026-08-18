@@ -1,28 +1,8 @@
-# 本文件的工作目录是在用户根目录，本目录携带是因为如果放外面就会更新的时候覆盖你的修改，因此我只能藏起来。
-# 如果没有按初始化说明进行初始化那么你需要手动复制本文件到上层目录，请知悉。
 patch:
   speller/algebra:
     __patch:
-      #- wanxiang_algebra:/模糊音_z_zh  # 这里取消注释启用，wanxiang_algebra.yaml文件末尾有具体条目，不含的custom自定义即可
       - wanxiang_algebra:/base/小鹤双拼
-      # 可选输入方案名称：全拼，自然码, 自然龙, 汉心龙，小鹤双拼, 搜狗双拼, 微软双拼, 智能ABC, 紫光双拼, 国标双拼，拼音加加，乱序17
-      ##########################以上格式受指令初始化控制，最好保持格式不变，如果发生变更请不要使用指令修改相关数据#####################################
-  #这里改成什么就需要手动创建同名的 custom_phrasexx.txt 文件在用户目录，这个文件主要用于置顶，编码为自定义编码的词汇
-  #custom_phrase/user_dict: custom_phrasexx
-  #导入根目录下名称为userxx.dict.yaml的自定义固定词典，编码要与固定词库一致，编码权重都不要少，形如姓名、专有名词公司名称等等
-  #translator/packs/+:
-  #  - userxx
-
-  #下面是候选数量
-  menu/page_size: 6
-
-  #以下恢复``造词功能，也就是平时不记录，引导才记录，按需造词，如果你想恢复这个功能，请取消注释----
-  #recognizer/patterns/add_user_dict: "^``[A-Za-z/`']*$"      #自造词引导方式
-  #user_dict_set/enable_user_dict: true
-  #add_user_dict/enable_user_dict: true
-  # 取消注释以开启自动无词频造词
-  #add_user_dict/enable_auto_phrase: true
-
+  grammar/language: wanxiang-lts-zh-hant
   time_formats: [H:M, H點M分, H:M:S, H時M分S秒, AI:M, I:M P]
   datetime_formats:
     - Y-m-d H:M:S
@@ -30,7 +10,16 @@ patch:
     - YmdHMS
     - Y年m月d日 H點M分
     - y/m/d I:M p
-  grammar/language: wanxiang-lts-zh-hant
+  key_binder/bindings/+:
+    - when: paging
+      accept: comma
+      send: Page_Up
+    - when: has_menu
+      accept: period
+      send: Page_Down
+    - when: has_menu
+      accept: semicolon
+      send: 2
   switches:
     - name: ascii_mode
       states: [中文, 英文]
@@ -66,6 +55,9 @@ patch:
       states: [大字集, 小字集]
     - name: char_priority
       states: [词组先, 单字先]
+    - name: english
+      reset: 1
+      states: [英文关, 英文开]
   super_replacer/rules:
     - comment_mode: none
       files:
@@ -130,6 +122,11 @@ patch:
       option: true
       prefix: _enabb_
       tags: [abc]
+    - files:
+        - lua/data/derive.txt
+      mode: append
+      option: true
+      tags: [abc]
   charset_filter:
     - addlist:
         - 诶濛硷氽尛躝〇冇吔磺咗囧屌鲶芶咲畑垅𰻝𰻞龍朙頔雲
@@ -148,79 +145,3 @@ patch:
       base: fT
       blacklist: []
       option: t2tw
-  key_binder/bindings:
-    - accept: Control+Shift+3
-      when: always
-      toggle: ascii_punct
-    - accept: Control+Shift+numbersign
-      when: always
-      toggle: ascii_punct
-    - accept: Control+Shift+4
-      toggle: t2s
-      when: always
-    - accept: Control+Shift+dollar
-      toggle: t2s
-      when: always
-    - accept: Alt+Left
-      when: composing
-      send: Shift+Left
-    - accept: Alt+Right
-      when: composing
-      send: Shift+Right
-    - accept: Control+w
-      send: Control+BackSpace
-      when: composing
-    - accept: Control+e
-      when: has_menu
-      toggle: chinese_english
-    - accept: Control+a
-      when: has_menu
-      toggle: tone_hint
-    - accept: Control+s
-      toggle: tone_display
-      when: has_menu
-    - accept: Control+t
-      toggle: super_tips
-      when: has_menu
-    - accept: Control+g
-      toggle: charset_filter
-      when: has_menu
-    - accept: Control+g
-      toggle: charset_filter
-      when: composing
-    - accept: Shift+space
-      when: always
-      select: .next
-    - accept: Tab
-      when: has_menu
-      send: Control+Right
-    - accept: Tab
-      when: composing
-      send: Control+Right
-    - accept: Control+Tab
-      when: composing
-      send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
-    - accept: /
-      send_sequence: '{space}'
-      match: ^/$
-    - accept: backslash
-      send_sequence: '{Clear}{backslash}'
-      match: ^›+$
-    - accept: comma
-      send_sequence: '{Clear}{comma}'
-      match: ^›+$
-    - accept: period
-      send_sequence: '{Clear}{period}'
-      match: ^›+$
-    - accept: Return
-      send_sequence: '{Clear}{Return}'
-      match: ^›+$
-    - accept: comma
-      send: 'Page_Up'
-      when: paging
-    - accept: period
-      send: Page_Down
-      when: has_menu
-    - accept: semicolon
-      send: '2'
-      when: has_menu
