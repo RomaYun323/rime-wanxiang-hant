@@ -16,26 +16,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check for updates
-        id: check_update  # ✅ 這裡已修正為 check_update
+        id: check_update
         run: |
           # 取得上游 wanxiang 分支最新的 commit SHA
           UPSTREAM_SHA=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git wanxiang | cut -f1)
           
-          # 檢查是否成功取得 SHA，避免空字串造成的誤判（防呆機制）
           if [ -z "$UPSTREAM_SHA" ]; then
             echo "Error: 無法取得上游 wanxiang 分支的 commit SHA，請檢查分支名稱或網路連線。"
             exit 1
           fi
 
-          # 取得紀錄在本地的上次檢查 SHA
           if [ -f .last_sha ]; then
             LAST_SHA=$(cat .last_sha)
           else
             LAST_SHA=""
           fi
           
-          if [ "$UPSTREAM_SHA" == "$LAST_SHA" ]; then
-            echo "No updates found."
+          # 判斷是否為手動觸發
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "偵測到手動觸發，強制執行後續建置與發佈！"
+            echo "$UPSTREAM_SHA" > .last_sha
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif [ "$UPSTREAM_SHA" == "$LAST_SHA" ]; then
+            echo "No updates found. (Auto-schedule skip)"
             echo "should_run=false" >> $GITHUB_OUTPUT
           else
             echo "Updates found! (Upstream: $UPSTREAM_SHA, Local: $LAST_SHA)"
