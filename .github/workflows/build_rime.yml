@@ -51,14 +51,14 @@ jobs:
         if: steps.check_update.outputs.should_run == 'true'
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang，排除指定檔案，並清理本地舊檔案
+      # 需求 1: 取得 rime-wanxiang，排除指定檔案，並鏡像同步到本地 (rsync 新寫法)
       - name: 1. Clone rime-wanxiang base
         if: steps.check_update.outputs.should_run == 'true'
         run: |
           git clone --depth 1 https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
           rm -rf /tmp/rime-wanxiang/.git
           
-          # 1. 刪除不需要的檔案類型與說明文件
+          # 1. 先在暫存區刪除上游不需要的檔案類型與說明文件
           find /tmp/rime-wanxiang -type f -name "*.md" -delete
           find /tmp/rime-wanxiang -type f -name "*.json" -delete
           rm -rf /tmp/rime-wanxiang/docs
@@ -79,20 +79,16 @@ jobs:
             \) -delete
           fi
 
-          # 4. 清理本地舊倉庫檔案 (保留 .git, .github, custom_configs 等必要檔案)
-          echo "清理舊倉庫檔案，準備寫入新內容..."
-          find . -mindepth 1 -maxdepth 1 \
-            ! -name '.git' \
-            ! -name '.github' \
-            ! -name 'custom_configs' \
-            ! -name '.last_sha' \
-            ! -name '.gitignore' \
-            ! -name 'version.txt' \
-            ! -name 'README.md' \
-            -exec rm -rf {} +
-          
-          # 5. 複製新檔案到專案根目錄
-          cp -r /tmp/rime-wanxiang/* ./
+          # 4. 使用 rsync 進行鏡像同步
+          echo "同步上游檔案到本地倉庫..."
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='custom_configs' \
+            --exclude='.last_sha' \
+            --exclude='.gitignore' \
+            --exclude='README.md' \
+            /tmp/rime-wanxiang/ ./
 
       # 需求 2: 取得 RIME-LMDG 詞庫
       - name: 2. Get RIME-LMDG Dicts and Gram
@@ -117,7 +113,7 @@ jobs:
           rm -rf ./dicts
           cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
 
-      # 需求 4: 處理 OpenCC Dicts
+      # 需求 4: 處理 OpenCC Dicts (還原為你最初的 \\t 寫法)
       - name: 4. Process OpenCC Dicts
         if: steps.check_update.outputs.should_run == 'true'
         run: |
@@ -125,8 +121,8 @@ jobs:
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
           sed -i '/^#/d' TSPhrases.txt
           sed -i '/^#/d' TSCharacters.txt
-          sed -i 's/ /\t/g' TSPhrases.txt
-          sed -i 's/ /\t/g' TSCharacters.txt
+          sed -i 's/ /\\t/g' TSPhrases.txt
+          sed -i 's/ /\\t/g' TSCharacters.txt
           grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
           grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
           mkdir -p lua/data/
@@ -167,8 +163,8 @@ jobs:
           FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt"  "lua/wanxiang/shijian.lua" "lua/wanxiang/number_conversion.lua")
           for file in "${FILES[@]}"; do
             if [ -f "$file" ]; then
-              # 改用 s2t.json，讓整體的用字與詞彙更符合台灣習慣
-              opencc -i "$file" -o "${file}.tmp" -c s2t.json
+              # 改用 s2twp.json，讓整體的用字與詞彙更符合台灣習慣
+              opencc -i "$file" -o "${file}.tmp" -c s2twp.json
               mv "${file}.tmp" "$file"
               
               # 針對特定檔案做額外處理，確保大寫數字完全正確
