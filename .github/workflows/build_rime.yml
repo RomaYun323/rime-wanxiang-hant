@@ -200,12 +200,39 @@ jobs:
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
 
-      # 需求 10: 觸發發布 Workflow
-      - name: 10. Trigger Release Workflow
+            # 需求 10: 發布 Release
+      - name: 10. Prepare Release Env
         if: steps.check_update.outputs.should_run == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "通知 Release Workflow 開始執行..."
-          # 利用 GitHub CLI 觸發名為 release.yml 的工作流
-          gh workflow run release.yml
+          if [ -f version.txt ]; then
+            VERSION=$(cat version.txt)
+          else
+            VERSION=$(date +'%Y%m%d%H%M')
+          fi
+          echo "RELEASE_VERSION=v$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TITLE=v$VERSION Rime万象拼音输入方案-繁體詞庫" >> $GITHUB_ENV
+        
+      - name: Release
+        if: steps.check_update.outputs.should_run == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: ${{ env.RELEASE_TITLE }}
+          body: |
+            自動編譯同步的客製化繁體 RIME 方案包。
+            
+            📦 **兩種版本供選擇**
+            - `rime-wanxiang-base.zip`：不含大模型
+            - `rime-wanxiang-full.zip`：包含大模型 (wanxiang-lts-zh-hant.gram)
+            
+            📥 **繁體模型官方 Release**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+            
+            ⚙️ **繁體補丁與聯絡人詞庫下載**：
+            - 繁體方案補丁：[wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/wanxiang.custom.yaml)
+            - 聯絡人詞庫：[contacts.dict.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/contacts.dict.yaml)
+            
+          files: |
+            rime-wanxiang-base.zip
+            rime-wanxiang-full.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
