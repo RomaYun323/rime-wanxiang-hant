@@ -63,6 +63,8 @@ jobs:
           find /tmp/rime-wanxiang -type f -name "*.json" -delete
           rm -rf /tmp/rime-wanxiang/docs
           rm -f /tmp/rime-wanxiang/mkdocs.yml
+          rm -f /tmp/rime-wanxiang/.yamlfmt
+          rm -f /tmp/rime-wanxiang/.gitattributes
           
           # 2. 刪除指定的 lua/data/ ST 檔案
           rm -f /tmp/rime-wanxiang/lua/data/STCharacters.txt /tmp/rime-wanxiang/lua/data/STPhrases.txt
