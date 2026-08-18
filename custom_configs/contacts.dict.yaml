@@ -1,7 +1,6 @@
 ---
 name: contacts
 version: "1"
-sort: contacts
 use_preset_vocabulary: true
 ...
 # 在下方新增通訊錄
