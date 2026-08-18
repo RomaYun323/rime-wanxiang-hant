@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check for updates
-        id: check_updates
+        id: check_update  # ✅ 這裡已修正為 check_update
         run: |
           # 取得上游 wanxiang 分支最新的 commit SHA
           UPSTREAM_SHA=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git wanxiang | cut -f1)
@@ -109,8 +109,8 @@ jobs:
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
           sed -i '/^#/d' TSPhrases.txt
           sed -i '/^#/d' TSCharacters.txt
-          sed -i 's/ /\\t/g' TSPhrases.txt
-          sed -i 's/ /\\t/g' TSCharacters.txt
+          sed -i 's/ /\t/g' TSPhrases.txt
+          sed -i 's/ /\t/g' TSCharacters.txt
           grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
           grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
           mkdir -p lua/data/
