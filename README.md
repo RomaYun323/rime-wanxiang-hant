@@ -3,7 +3,7 @@
 
 
 
-僅根據個人輸入習慣修改繁體詞庫
+僅根據個人輸入習慣修改繁體方案
 ## 修改內容
 
 - 新增繁體方案補丁`wanxiang.custom.yaml`, 聯絡人詞庫`contacts.dict.yaml`
