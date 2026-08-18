@@ -2,7 +2,7 @@ name: Build wanxiang-base-hant
 
 on:
   schedule:
-    - cron: '45 14 * * *' # UTC 0點執行 (台灣時間 08:00)
+    - cron: '0 0 * * *' # UTC 0點執行 (台灣時間 08:00)
   workflow_dispatch: {} # 保留手動觸發功能
 
 jobs:
