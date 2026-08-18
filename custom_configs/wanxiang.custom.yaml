@@ -224,4 +224,3 @@ patch:
     - accept: semicolon
       send: '2'
       when: has_menu
-    '/cha': [✕,✖]
