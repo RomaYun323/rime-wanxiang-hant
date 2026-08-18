@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write  # 👈 新增這行：允許這個腳本觸發另一個 Workflow
+      actions: write  # 👈 允許這個腳本觸發另一個 Workflow
     steps:
       # 必須先 Checkout 才能讀取本地的 .last_sha 檔案
       - name: Checkout your repository
@@ -51,7 +51,7 @@ jobs:
         if: steps.check_update.outputs.should_run == 'true'
         run: sudo apt-get update && sudo apt-get install -y opencc
 
-      # 需求 1: 取得 rime-wanxiang，排除指定檔案
+      # 需求 1: 取得 rime-wanxiang，排除指定檔案，並清理本地舊檔案
       - name: 1. Clone rime-wanxiang base
         if: steps.check_update.outputs.should_run == 'true'
         run: |
@@ -78,8 +78,20 @@ jobs:
               -name "赞赏.jpg" \
             \) -delete
           fi
+
+          # 4. 清理本地舊倉庫檔案 (保留 .git, .github, custom_configs 等必要檔案)
+          echo "清理舊倉庫檔案，準備寫入新內容..."
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name '.github' \
+            ! -name 'custom_configs' \
+            ! -name '.last_sha' \
+            ! -name '.gitignore' \
+            ! -name 'version.txt' \
+            ! -name 'README.md' \
+            -exec rm -rf {} +
           
-          # 4. 複製到專案根目錄
+          # 5. 複製新檔案到專案根目錄
           cp -r /tmp/rime-wanxiang/* ./
 
       # 需求 2: 取得 RIME-LMDG 詞庫
@@ -113,8 +125,8 @@ jobs:
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
           sed -i '/^#/d' TSPhrases.txt
           sed -i '/^#/d' TSCharacters.txt
-          sed -i 's/ /\\t/g' TSPhrases.txt
-          sed -i 's/ /\\t/g' TSCharacters.txt
+          sed -i 's/ /\t/g' TSPhrases.txt
+          sed -i 's/ /\t/g' TSCharacters.txt
           grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
           grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
           mkdir -p lua/data/
@@ -196,11 +208,12 @@ jobs:
           grep -qxF "rime-wanxiang-base.zip" .gitignore || echo "rime-wanxiang-base.zip" >> .gitignore
           grep -qxF "rime-wanxiang-full.zip" .gitignore || echo "rime-wanxiang-full.zip" >> .gitignore
           
-          git add .
+          # 使用 git add -A 確保「檔案刪除」的操作也能被加入 Commit
+          git add -A
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
 
-            # 需求 10: 發布 Release
+      # 需求 10: 發布 Release
       - name: 10. Prepare Release Env
         if: steps.check_update.outputs.should_run == 'true'
         run: |
