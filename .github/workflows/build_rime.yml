@@ -164,11 +164,22 @@ jobs:
       - name: 6. Convert Specific Files to Traditional
         if: steps.check_update.outputs.should_run == 'true'
         run: |
-          FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt" "lua/wanxiang/number_translator.lua" "lua/wanxiang/shijian.lua" "lua/wanxiang/number_conversion.lua")
+          FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt"  "lua/wanxiang/shijian.lua" "lua/wanxiang/number_conversion.lua")
           for file in "${FILES[@]}"; do
             if [ -f "$file" ]; then
+              # 改用 s2t.json，讓整體的用字與詞彙更符合台灣習慣
               opencc -i "$file" -o "${file}.tmp" -c s2t.json
               mv "${file}.tmp" "$file"
+              
+              # 針對特定檔案做額外處理，確保大寫數字完全正確
+              if [ "$file" == "lua/wanxiang/number_conversion.lua" ]; then
+                # MacOS 環境的 sed 用法需要加 ''，Ubuntu (GitHub Actions 預設) 則直接用 -i 即可
+                sed -i 's/叄/參/g' "$file"
+                
+                # 如果還有其他字元想強制指定，可以繼續加上去，例如：
+                # sed -i 's/貳/貳/g' "$file" 
+                # sed -i 's/陸/陸/g' "$file"
+              fi
             fi
           done
 
