@@ -1,16 +1,16 @@
 -- @amzxyz  https://github.com/amzxyz/rime-wanxiang
--- 万象拼音
+-- 萬象拼音
 
 local LOWER_DIGITS = { "〇", "一", "二", "三", "四", "五", "六", "七", "八", "九" }
-local UPPER_DIGITS = { "零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖" }
+local UPPER_DIGITS = { "零", "壹", "貳", "叄", "肆", "伍", "陸", "柒", "捌", "玖" }
 
 local LOWER_PLACE_UNITS = { "", "十", "百", "千" }
 local UPPER_PLACE_UNITS = { "", "拾", "佰", "仟" }
 
-local SIMPLIFIED_GROUP_UNITS = { "", "万", "亿" }
+local SIMPLIFIED_GROUP_UNITS = { "", "萬", "億" }
 local TRADITIONAL_GROUP_UNITS = { "", "萬", "億" }
 
-local CURRENCY_FRACTION_UNITS = { "角", "分", "厘", "毫" }
+local CURRENCY_FRACTION_UNITS = { "角", "分", "釐", "毫" }
 
 local SUPERSCRIPT_DIGITS = {
     ["0"] = "⁰",
@@ -91,7 +91,7 @@ end
 local function convert_integer_to_chinese(integer, uppercase, group_units, suffix)
     integer = normalize_integer_digits(integer)
     if #integer > 12 then
-        return "数值超限！"
+        return "數值超限！"
     end
 
     local digits = uppercase and UPPER_DIGITS or LOWER_DIGITS
@@ -393,9 +393,9 @@ local function build_base_candidates(number)
     local integer = normalize_integer_digits(number.integer)
 
     return {
-        { sign .. "0x" .. decimal_string_to_base(integer, 16), "〔十六进制〕" },
-        { sign .. "0b" .. decimal_string_to_base(integer, 2), "〔二进制〕" },
-        { sign .. "0o" .. decimal_string_to_base(integer, 8), "〔八进制〕" },
+        { sign .. "0x" .. decimal_string_to_base(integer, 16), "〔十六進制〕" },
+        { sign .. "0b" .. decimal_string_to_base(integer, 2), "〔二進制〕" },
+        { sign .. "0o" .. decimal_string_to_base(integer, 8), "〔八進制〕" },
     }
 end
 
@@ -407,12 +407,12 @@ local function build_ratio_candidates(number)
     local right_chinese = convert_integer_to_chinese(number.right, false, SIMPLIFIED_GROUP_UNITS, "")
 
     if left_negative then
-        left_chinese = "负" .. left_chinese
+        left_chinese = "負" .. left_chinese
     end
 
     return {
         { number.left .. ":" .. number.right, "〔比例〕" },
-        { number.left .. "∶" .. number.right, "〔比例符号〕" },
+        { number.left .. "∶" .. number.right, "〔比例符號〕" },
         { left_chinese .. "比" .. right_chinese, "〔中文比例〕" },
     }
 end
@@ -431,7 +431,7 @@ local function build_number_candidates(text)
         return build_ratio_candidates(number)
     end
 
-    local sign_prefix = number.negative and "负" or ""
+    local sign_prefix = number.negative and "負" or ""
 
     local lower_integer = convert_integer_to_chinese(
         number.integer, false, SIMPLIFIED_GROUP_UNITS, ""
@@ -450,8 +450,8 @@ local function build_number_candidates(text)
     local upper_plain = sign_prefix .. upper_integer
 
     if number.has_decimal then
-        lower_plain = lower_plain .. "点" .. spell_digits(number.fraction, false)
-        upper_plain = upper_plain .. "点" .. spell_digits(number.fraction, true)
+        lower_plain = lower_plain .. "點" .. spell_digits(number.fraction, false)
+        upper_plain = upper_plain .. "點" .. spell_digits(number.fraction, true)
     end
 
     local lower_currency = sign_prefix ..
@@ -465,57 +465,57 @@ local function build_number_candidates(text)
     local candidates
     if number.negative then
         candidates = {
-            { lower_plain, "〔小写〕" },
-            { upper_plain, "〔繁体大写〕" },
+            { lower_plain, "〔小寫〕" },
+            { upper_plain, "〔繁體大寫〕" },
         }
     else
         candidates = {
-            { lower_plain, "〔小写〕" },
-            { upper_currency, "〔大写〕" },
-            { upper_plain, "〔繁体大写〕" },
-            { lower_currency, "〔小写金额〕" },
+            { lower_plain, "〔小寫〕" },
+            { upper_currency, "〔大寫〕" },
+            { upper_plain, "〔繁體大寫〕" },
+            { lower_currency, "〔小寫金額〕" },
         }
     end
 
     if #number.integer > 1 and number.integer:sub(1, 1) == "0" then
         local digit_spelling = spell_digits(number.integer, false)
         if number.has_decimal then
-            digit_spelling = digit_spelling .. "点" .. spell_digits(number.fraction, false)
+            digit_spelling = digit_spelling .. "點" .. spell_digits(number.fraction, false)
         end
         if number.negative then
-            digit_spelling = "负" .. digit_spelling
+            digit_spelling = "負" .. digit_spelling
         end
         candidates[#candidates + 1] = { digit_spelling, "〔逐位〕" }
     end
 
-    candidates[#candidates + 1] = { format_grouped_number(number), "〔千分计数〕" }
+    candidates[#candidates + 1] = { format_grouped_number(number), "〔千分計數〕" }
 
     if number.negative then
         local accounting = format_accounting_negative(number)
         if accounting then
-            candidates[#candidates + 1] = { accounting, "〔会计格式〕" }
+            candidates[#candidates + 1] = { accounting, "〔會計格式〕" }
         end
     else
         local fixed_currency = format_fixed_currency(number)
         if fixed_currency then
-            candidates[#candidates + 1] = { fixed_currency, "〔人民币〕" }
+            candidates[#candidates + 1] = { fixed_currency, "〔人民幣〕" }
         end
 
     end
 
     local scientific = format_scientific_notation(number)
     if scientific then
-        candidates[#candidates + 1] = { scientific, "〔科学计数〕" }
+        candidates[#candidates + 1] = { scientific, "〔科學計數〕" }
     end
 
     local e_notation = format_e_notation(number)
     if e_notation then
-        candidates[#candidates + 1] = { e_notation, "〔E计数〕" }
+        candidates[#candidates + 1] = { e_notation, "〔E計數〕" }
     end
 
     local engineering = format_engineering_notation(number)
     if engineering and engineering ~= scientific then
-        candidates[#candidates + 1] = { engineering, "〔工程计数〕" }
+        candidates[#candidates + 1] = { engineering, "〔工程計數〕" }
     end
 
     local base_candidates = build_base_candidates(number)
