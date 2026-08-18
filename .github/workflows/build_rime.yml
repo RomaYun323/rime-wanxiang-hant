@@ -2,7 +2,7 @@ name: Build wanxiang-base-hant
 
 on:
   schedule:
-    - cron: '0 9 * * *' # UTC 0點執行 (台灣時間 08:00)
+    - cron: '0 0 * * *' # UTC 0點執行 (台灣時間 08:00)
   workflow_dispatch: {} # 保留手動觸發功能
 
 jobs:
@@ -220,12 +220,15 @@ jobs:
           body: |
             自動編譯同步的客製化繁體 RIME 環境包。
             📥 **繁體模型官方 Release**：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
-            ⚙️ **繁體custom補丁下載**：[wanxiang.custom.yaml](https://github.com/${{ github.repository }}/raw/main/custom_configs/wanxiang.custom.yaml)
-            📦 **兩種版本供選擇**：
+            
+            ⚙️ **繁體方案補丁**：[wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_VERSION }}/wanxiang.custom.yaml)
+            
+            📦 **兩種版本供選擇(均不含繁體方案補丁)**：
             1. `rime-wanxiang-base.zip`：**不含大模型**
             2. `rime-wanxiang-full.zip`：**包含大模型 (wanxiang-lts-zh-hant.gram)**
           files: |
             rime-wanxiang-base.zip
             rime-wanxiang-full.zip
+            custom_configs/wanxiang.custom.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
