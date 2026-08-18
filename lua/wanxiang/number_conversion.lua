@@ -2,7 +2,7 @@
 -- 萬象拼音
 
 local LOWER_DIGITS = { "〇", "一", "二", "三", "四", "五", "六", "七", "八", "九" }
-local UPPER_DIGITS = { "零", "壹", "貳", "叄", "肆", "伍", "陸", "柒", "捌", "玖" }
+local UPPER_DIGITS = { "零", "壹", "貳", "參", "肆", "伍", "陸", "柒", "捌", "玖" }
 
 local LOWER_PLACE_UNITS = { "", "十", "百", "千" }
 local UPPER_PLACE_UNITS = { "", "拾", "佰", "仟" }
