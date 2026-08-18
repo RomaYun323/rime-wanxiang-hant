@@ -221,16 +221,16 @@ jobs:
           body: |
             自動編譯同步的客製化繁體 RIME 方案包。
             
-            📦 **兩種版本供選擇**
-            - `rime-wanxiang-base.zip`：不含大模型
-            - `rime-wanxiang-full.zip`：包含大模型 (wanxiang-lts-zh-hant.gram)
+            📦 **兩種版本供選擇(不含繁體補丁與聯絡人詞庫)**
+            - `rime-wanxiang-base.zip`：不含大模型語法包
+            - `rime-wanxiang-full.zip`：包含大模型語法包 (wanxiang-lts-zh-hant.gram)
             
-            📥 **繁體模型官方 Release**
-            - `wanxiang-lts-zh-hant.gram`：[Rime万象语法模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)
+            📥 **繁體大模型語法包 官方 Release(必裝)**
+            - [wanxiang-lts-zh-hant.gram](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)：大模型語法包
             
-            ⚙️ **繁體補丁與聯絡人詞庫下載**：
-            - `wanxiang.custom.yaml`：[繁體方案補丁](https://github.com/${{ github.repository }}/releases/download/custom-configs/wanxiang.custom.yaml)
-            - `contacts.dict.yaml`：[聯絡人詞庫](https://github.com/${{ github.repository }}/releases/download/custom-configs/contacts.dict.yaml)
+            ⚙️ **繁體方案補丁與聯絡人詞庫下載(必裝)**：
+            - [wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/wanxiang.custom.yaml)：繁體方案補丁，否則繁體方案無法生效
+            - [contacts.dict.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/contacts.dict.yaml)：聯絡人詞庫，或於`wanxiang.dict.yaml`註釋掉`- contacts`
             
           files: |
             rime-wanxiang-base.zip
