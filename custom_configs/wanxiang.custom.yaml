@@ -65,7 +65,7 @@ patch:
       toggle: t2s
       when: always
     - accept: Control+Shift+dollar
-      toggle: s2t
+      toggle: t2s
       when: always
     - accept: Alt+Left
       send: Shift+Left
@@ -206,14 +206,14 @@ patch:
       blacklist: []
       option: charset_filter
     - addlist: []
-      base: jg
+      base: j
       blacklist: []
       option: t2s
     - addlist: []
-      base: hT
+      base: h
       blacklist: []
       option: t2hk
     - addlist: []
-      base: fT
+      base: f
       blacklist: []
       option: t2tw
