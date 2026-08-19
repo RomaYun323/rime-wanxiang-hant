@@ -2394,18 +2394,6 @@ local function translator(input, seg, env)
     local context = engine.context
     local config  = engine.schema.config
     local segment = context.composition:back()
-    local function set_ndate_tag(context, on)
-        local comp = context and context.composition
-        if not comp or comp:empty() then return end
-        local seg = comp:back()
-        if not seg then return end
-        if on then
-            seg.tags = seg.tags + Set({ "Ndate" })
-        else
-            seg.tags = seg.tags - Set({ "Ndate" })
-        end
-    end
-
     -- 你的 translator 主體裏（只貼 N 分支及其結構）
     if input:sub(1, 1) == "N" then
         local n   = input:sub(2)
@@ -2414,16 +2402,17 @@ local function translator(input, seg, env)
         local ndate_mode  = (only_digits and len >= 1 and len <= 8)
         local handled = false
 
-        -- 僅按形態開/關標籤，不提前 return
-        set_ndate_tag(context, ndate_mode)
+        if ndate_mode then
+            segment.tags = segment.tags + Set({ "shijian" })
+        else
+            segment.tags = segment.tags - Set({ "shijian" })
+        end
 
         if ndate_mode then
             local yr = os.date("%Y")
 
             -- NMMDD：長度=4，且“不是年份（19xx/20xx）”時才當作月日
             if (len == 4) and not (n:match("^19%d%d$") or n:match("^20%d%d$")) then
-                context:set_property("sequence_adjustment_code", "Nmmdd")
-
                 local mm = tonumber(n:sub(1, 2))
                 local dd = tonumber(n:sub(3, 4))
 
@@ -2464,8 +2453,6 @@ local function translator(input, seg, env)
             -- NYYYY...：以 19/20 開頭的年份（N2025 / N20250101 / N2025010101）
             -- 提示“日期不存在”僅在長度 >= 8（yyyyMMdd）時進行
             if not handled and (n:match("^20%d%d") or n:match("^19%d%d")) then
-                context:set_property("sequence_adjustment_code", "N")
-
                 local lunar, status = QueryLunarInfo(env, n)
 
                 -- 輸入完整到 YYYYMMDD 後，再根據三種語義的真實狀態給提示。
@@ -2521,8 +2508,6 @@ local function translator(input, seg, env)
 
     -- 日期候選項
     if (command == "rq" or command == "77") then
-        context:set_property("sequence_adjustment_code", "/rq")
-
         local now_ts = os.time()
         local today = os.date("*t", now_ts)
         local num_year = string.format(" 〔%03d/%d〕", today.yday, IsLeap(today.year))
@@ -2542,9 +2527,6 @@ local function translator(input, seg, env)
     local finished_num, sign = string.match(command, "^rc(%d+)([-+=op])$")
 
     if is_today or pending_num or finished_num then
-        segment.tags = segment.tags + Set({ "shijian" })
-        context:set_property("sequence_adjustment_code", "/rc")
-
         if pending_num then
             local hint = string.format("差值%s天 (從前按 -/o，未來按 +/p/=)", pending_num)
             generate_candidates(input, "rc", seg, { { hint, "等待輸入..." } })
@@ -2578,8 +2560,6 @@ local function translator(input, seg, env)
     end
     -- 時間候選項
     if (command == "sj" or command == "75") then
-        context:set_property("sequence_adjustment_code", "/sj")
-
         local now_ts = os.time()
         local now = os.date("*t", now_ts)
         local hour = os.date("%H", now_ts)
@@ -2601,9 +2581,6 @@ local function translator(input, seg, env)
     end
     -- 世界時鐘功能 (/utc)
     if command == "utc" then
-        segment.tags = segment.tags + Set({ "shijian" })
-        context:set_property("sequence_adjustment_code", "/utc")
-
         local now = os.time()
         local candidates = {}
         local utc_tab = os.date("!*t", now)
@@ -2638,8 +2615,6 @@ local function translator(input, seg, env)
     end
     -- 英文日期（/ed）
     if (command == "ed" or command == "33") then
-        context:set_property("sequence_adjustment_code", "/ed")
-
         local today = os.date("*t")
         local candidates = build_configured_format_candidates(config, "english_date_formats", today, function()
             return {
@@ -2655,8 +2630,6 @@ local function translator(input, seg, env)
 
     -- 日期+時間（/dt）
     if (command == "dt" or command == "38") then
-        context:set_property("sequence_adjustment_code", "/dt")
-
         local now_ts = os.time()
         local now = os.date("*t", now_ts)
         local candidates = build_configured_format_candidates(config, "datetime_formats", now, function()
@@ -2673,9 +2646,6 @@ local function translator(input, seg, env)
 
     -- 時間戳（/tt）
     if (command == "tt" or command == "88") then
-        -- 啓用手動排序支持
-        context:set_property("sequence_adjustment_code", "/tt")
-
         -- 當前本地時間表 & 對應 Unix 秒
         local now = os.date("*t")
         local epoch_s = os.time{
@@ -2704,8 +2674,6 @@ local function translator(input, seg, env)
     end
     -- 農曆候選項
     if (command == "nl" or command == "65") then
-        context:set_property("sequence_adjustment_code", "/nl")
-
         local now_ts = os.time()
         local year = "〔" .. os.date("%Y", now_ts) .. "年〕"
         local candidates = build_lunar_only_candidates(build_lunar_snapshot(now_ts))
@@ -2716,9 +2684,6 @@ local function translator(input, seg, env)
     end
 
     if (command == "xq" or command == "97") then
-        --- 設置手動排序的排序編碼，以啓用手動排序支持
-        context:set_property("sequence_adjustment_code", "/xq")
-
         local now = os.date("*t")
         local _, weekno = iso_week_number(now.year, now.month, now.day)
         local num_weekday = "〔第 " .. weekno .. " 周〕"
@@ -2732,9 +2697,6 @@ local function translator(input, seg, env)
 
     -- 第幾周
     if (command == "ww" or command == "99") then
-        --- 設置手動排序的排序編碼，以啓用手動排序支持
-        context:set_property("sequence_adjustment_code", "/ww")
-
         local now = os.date("*t")
         local _, weekno = iso_week_number(now.year, now.month, now.day)
         local weekno_str = tostring(weekno)
@@ -2746,8 +2708,6 @@ local function translator(input, seg, env)
 
     -- 節氣候選項
     if (command == "jq" or command == "55") then
-        --- 設置手動排序的排序編碼，以啓用手動排序支持
-        context:set_property("sequence_adjustment_code", "/jq")
         local jqs = GetNowTimeJq(os.date("%Y%m%d", os.time()))
         --local jqs = GetNowTimeJq(os.date("%Y%m%d", os.time() - 3600 * 24 * 15)) 向前獲取一個歷史節氣
         local candidates = {}
@@ -2789,9 +2749,6 @@ local function translator(input, seg, env)
 
     -- 節日查詢
     if (command == "jr" or command == "57") then
-        --- 設置手動排序的排序編碼，以啓用手動排序支持
-        context:set_property("sequence_adjustment_code", "/jr")
-
         local upcoming_holidays = get_upcoming_holidays() -- 獲取所有即將到來的節日
         local candidates = {}
         -- 格式化輸出節日信息
