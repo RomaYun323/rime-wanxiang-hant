@@ -3505,7 +3505,7 @@ dlii	戴笠乘車
 dldd	多勞多得
 dldf	顛鸞倒鳳
 dldj	跺了跺腳
-dldl	掂量掂量
+dldl	掂量掂量\t斗羅大陸
 dldq	顛來倒去\t獨攬大權
 dldu	定了定神
 dldt	點了點頭
