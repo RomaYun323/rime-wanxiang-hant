@@ -30,5 +30,4 @@ import_tables:
   - dicts/renming       #高频人名
   - dicts/taifeng       #最新台风表
   - dicts/fangyan       #收集全国方言
-  - contacts
 ...
