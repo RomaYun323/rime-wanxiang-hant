@@ -173,6 +173,8 @@ jobs:
                   echo "Error: wanxiang_symbols.yaml 找不到 '/3'、'/pp' 或 '/kx'，停止轉換以免破壞字形。"
                   exit 1
                 fi
+                # '/3' 的第一個大寫數字使用「參」，後面的「参、叁」維持原字形
+                THREE_LINE="${THREE_LINE/叁/參}"
               fi
 
               # 改用 s2t.json，讓整體的用字與詞彙更符合台灣習慣
