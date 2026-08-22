@@ -22,13 +22,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: custom-configs
-          name: 萬象輸入法繁體方案補丁與聯絡人詞庫
+          name: 萬象輸入法繁體方案補丁
           body: |
             - `wanxiang.custom.yaml`：繁體方案補丁
-            - `contacts.dict.yaml`：聯絡人詞庫
           files: |
             custom_configs/wanxiang.custom.yaml
-            custom_configs/contacts.dict.yaml
           make_latest: false # 🌟重要：設為 false 避免搶走你主環境包的 Latest 綠色標記
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
