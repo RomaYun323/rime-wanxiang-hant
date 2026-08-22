@@ -215,8 +215,8 @@ jobs:
             fi
           done
 
-      # 需求 8: 打包成兩種版本
-      - name: 8. Package to ZIPs
+      # 需求 7: 打包成兩種版本
+      - name: 7. Package to ZIPs
         if: steps.check_update.outputs.should_run == 'true'
         run: |
           zip -r rime-wanxiang-base.zip . \
@@ -231,8 +231,8 @@ jobs:
             echo "警告：找不到大模型檔案，無法產生完整包"
           fi
 
-      # 需求 9: 提交並推送
-      - name: 9. Commit and Push Source Code
+      # 需求 8: 提交並推送
+      - name: 8. Commit and Push Source Code
         if: steps.check_update.outputs.should_run == 'true'
         run: |
           git config user.name "github-actions[bot]"
@@ -247,8 +247,8 @@ jobs:
           git commit -m "build: auto generate hant workspace" || echo "No changes"
           git push origin main
 
-      # 需求 10: 發布 Release
-      - name: 10. Prepare Release Env
+      # 需求 9: 發布 Release
+      - name: 9. Prepare Release Env
         if: steps.check_update.outputs.should_run == 'true'
         run: |
           if [ -f version.txt ]; then
