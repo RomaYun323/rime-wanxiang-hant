@@ -1,0 +1,32 @@
+name: Publish Configs Release
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  release-configs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 直接強制覆寫指定的 Tag 標籤，確保標籤永遠指向最新程式碼
+      - name: Update Tag
+        run: |
+          git tag -f custom-configs
+          git push -f origin custom-configs
+
+      - name: Create or Update Configs Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-configs
+          name: 萬象輸入法繁體方案補丁
+          body: |
+            - `wanxiang.custom.yaml`：繁體方案補丁
+          files: |
+            custom_configs/wanxiang.custom.yaml
+          make_latest: false # 🌟重要：設為 false 避免搶走你主環境包的 Latest 綠色標記
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
