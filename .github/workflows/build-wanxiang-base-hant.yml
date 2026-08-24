@@ -1,0 +1,285 @@
+name: Build wanxiang-base-hant
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # UTC 0點執行 (台灣時間 08:00)
+  workflow_dispatch: {} # 保留手動觸發功能
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write  # 👈 允許這個腳本觸發另一個 Workflow
+    steps:
+      # 必須先 Checkout 才能讀取上次同步的 version.txt
+      - name: Checkout your repository
+        uses: actions/checkout@v4
+
+      - name: Check for updates
+        id: check_update
+        run: |
+          # 只比對上游 wanxiang 分支的 version.txt 內容
+          UPSTREAM_VERSION=$(curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/amzxyz/rime-wanxiang/wanxiang/version.txt \
+            | tr -d '\r\n')
+
+          if [ -z "$UPSTREAM_VERSION" ]; then
+            echo "Error: 無法取得上游 version.txt，請檢查分支名稱或網路連線。"
+            exit 1
+          fi
+
+          if [ -f version.txt ]; then
+            LOCAL_VERSION=$(tr -d '\r\n' < version.txt)
+          else
+            LOCAL_VERSION=""
+          fi
+
+          # 判斷是否為手動觸發
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "偵測到手動觸發，強制執行後續建置與發佈！"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif [ "$UPSTREAM_VERSION" == "$LOCAL_VERSION" ]; then
+            echo "version.txt 未變動（$UPSTREAM_VERSION），跳過自動更新。"
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "version.txt 已變動（上游: $UPSTREAM_VERSION，本地: ${LOCAL_VERSION:-無}）。"
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install OpenCC
+        if: steps.check_update.outputs.should_run == 'true'
+        run: sudo apt-get update && sudo apt-get install -y opencc
+
+      # 需求 1: 取得 rime-wanxiang，排除指定檔案，並鏡像同步到本地 (rsync 新寫法)
+      - name: 1. Clone rime-wanxiang base
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          git clone --depth 1 --branch wanxiang https://github.com/amzxyz/rime-wanxiang.git /tmp/rime-wanxiang
+          rm -rf /tmp/rime-wanxiang/.git
+          
+          # 1. 先在暫存區刪除上游不需要的檔案類型與說明文件
+          find /tmp/rime-wanxiang -type f -name "*.md" -delete
+          find /tmp/rime-wanxiang -type f -name "*.json" -delete
+          rm -rf /tmp/rime-wanxiang/docs
+          rm -f /tmp/rime-wanxiang/mkdocs.yml
+          rm -f /tmp/rime-wanxiang/.yamlfmt
+          rm -f /tmp/rime-wanxiang/.gitattributes
+          
+          # 2. 刪除指定的 lua/data/ ST 檔案
+          rm -f /tmp/rime-wanxiang/lua/data/STCharacters.txt /tmp/rime-wanxiang/lua/data/STPhrases.txt
+          
+          # 3. 如果 custom 資料夾存在，只保留指定的檔案
+          if [ -d "/tmp/rime-wanxiang/custom" ]; then
+            find /tmp/rime-wanxiang/custom -type f ! \( \
+              -name "wanxiang.custom.yaml" -o \
+              -name "wanxiang_english.custom.yaml" -o \
+              -name "wanxiang_mixedcode.custom.yaml" -o \
+              -name "wanxiang_reverse.custom.yaml" -o \
+              -name "万象键位映射.jpg" -o \
+              -name "赞赏.jpg" \
+            \) -delete
+          fi
+
+          # 4. 使用 rsync 進行鏡像同步
+          echo "同步上游檔案到本地倉庫..."
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='custom_configs' \
+            --exclude='.gitignore' \
+            --exclude='README.md' \
+            /tmp/rime-wanxiang/ ./
+
+      # 需求 2: 取得 RIME-LMDG 詞庫
+      - name: 2. Get RIME-LMDG Dicts and Gram
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          git clone --depth 1 https://github.com/amzxyz/RIME-LMDG.git /tmp/RIME-LMDG
+          curl -sL -f -o wanxiang-lts-zh-hant.gram "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram" || echo "警告：模型檔案下載失敗"
+
+      # 需求 3: 修改 zi.dict.yaml (無空白行) 並替換 dicts
+      - name: 3. Modify zi.dict.yaml and Replace dicts
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          FILE_PATH="custom_configs/zi.dict.新增部分.yaml"
+          if [ -f "$FILE_PATH" ]; then
+            [ -s "/tmp/RIME-LMDG/dicts_hant/zi.dict.yaml" ] && echo "" >> /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+            cat "$FILE_PATH" >> /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+          fi
+          if [ -f "/tmp/RIME-LMDG/dicts_hant/zi.dict.yaml" ]; then
+            grep -v '^[[:space:]]*$' /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml > /tmp/zi_clean.yaml
+            mv /tmp/zi_clean.yaml /tmp/RIME-LMDG/dicts_hant/zi.dict.yaml
+          fi
+          rm -rf ./dicts
+          cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
+
+      # 需求 4: 處理 OpenCC Dicts (還原為你最初的 \\t 寫法)
+      - name: 4. Process OpenCC Dicts
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSCharacters.txt -o TSCharacters.txt
+          curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
+          sed -i '/^#/d' TSPhrases.txt
+          sed -i '/^#/d' TSCharacters.txt
+          sed -i 's/ /\\t/g' TSPhrases.txt
+          sed -i 's/ /\\t/g' TSCharacters.txt
+          grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
+          grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
+          mkdir -p lua/data/
+          mv TSCharacters.txt lua/data/
+          mv TSPhrases.txt lua/data/
+
+      # 需求 5: 對齊本地 PowerShell 邏輯，合併並移除重複出現的行
+      - name: 5. Merge and Unique TWVariants.txt
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          CUSTOM_VARIANTS="custom_configs/修改TWVariants.txt"
+          TARGET_VARIANTS="lua/data/TWVariants.txt"
+          
+          if [ -f "$CUSTOM_VARIANTS" ] && [ -f "$TARGET_VARIANTS" ]; then
+            sed -i 's/\r//g' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
+            sed -i 's/^[[:space:]]*//;s/[[:space:]]*$//' "$CUSTOM_VARIANTS" "$TARGET_VARIANTS"
+            awk '
+              NF {
+                gsub(/^[ \t]+|[ \t]+$/, "", $0);
+                if ($0 != "") {
+                  count[$0]++;
+                  if (count[$0] == 1) { lines[++n] = $0; }
+                }
+              }
+              END {
+                for (i = 1; i <= n; i++) {
+                  if (count[lines[i]] == 1) { print lines[i]; }
+                }
+              }
+            ' "$TARGET_VARIANTS" "$CUSTOM_VARIANTS" > /tmp/TWVariants_unique.txt
+            mv /tmp/TWVariants_unique.txt "$TARGET_VARIANTS"
+          fi
+
+      # 需求 6: s2t 簡轉繁轉換
+      - name: 6. Convert Specific Files to Traditional
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          FILES=("lua/data/abbrev.txt" "lua/data/chengyu.txt" "lua/data/chinese_english.txt" "lua/data/emoji.txt" "lua/data/english_chinese.txt" "lua/data/others.txt" "lua/data/t9_abbrev.txt" "lua/data/tips_show.txt" "lua/wanxiang/shijian.lua" "lua/wanxiang/number_conversion.lua" "wanxiang_symbols.yaml")
+          for file in "${FILES[@]}"; do
+            if [ -f "$file" ]; then
+              # 數字符號、部件與康熙部首表必須保留上游原字形
+              if [ "$file" == "wanxiang_symbols.yaml" ]; then
+                THREE_LINE=$(grep -m1 "^[[:space:]]*'/3':" "$file" || true)
+                PP_LINE=$(grep -m1 "^[[:space:]]*'/pp':" "$file" || true)
+                KX_LINE=$(grep -m1 "^[[:space:]]*'/kx':" "$file" || true)
+                if [ -z "$THREE_LINE" ] || [ -z "$PP_LINE" ] || [ -z "$KX_LINE" ]; then
+                  echo "Error: wanxiang_symbols.yaml 找不到 '/3'、'/pp' 或 '/kx'，停止轉換以免破壞字形。"
+                  exit 1
+                fi
+                # '/3' 的第一個大寫數字使用「參」，後面的「参、叁」維持原字形
+                THREE_LINE="${THREE_LINE/叁/參}"
+              fi
+
+              # 改用 s2t.json，讓整體的用字與詞彙更符合台灣習慣
+              opencc -i "$file" -o "${file}.tmp" -c s2t.json
+              mv "${file}.tmp" "$file"
+              
+              # 針對特定檔案做額外處理，確保大寫數字完全正確
+              if [ "$file" == "lua/wanxiang/number_conversion.lua" ]; then
+                # MacOS 環境的 sed 用法需要加 ''，Ubuntu (GitHub Actions 預設) 則直接用 -i 即可
+                sed -i 's/叄/參/g' "$file"
+                
+                # 如果還有其他字元想強制指定，可以繼續加上去，例如：
+                # sed -i 's/貳/貳/g' "$file" 
+                # sed -i 's/陸/陸/g' "$file"
+              fi
+
+              # 將其餘內容的叄調整為參，最後還原不轉換的符號表
+              if [ "$file" == "wanxiang_symbols.yaml" ]; then
+                sed -i 's/叄/參/g' "$file"
+                awk -v three="$THREE_LINE" -v pp="$PP_LINE" -v kx="$KX_LINE" '
+                  BEGIN {
+                    quote = sprintf("%c", 39)
+                    three_key = quote "/3" quote ":"
+                    pp_key = quote "/pp" quote ":"
+                    kx_key = quote "/kx" quote ":"
+                  }
+                  {
+                    key = $0
+                    sub(/^[[:space:]]*/, "", key)
+                    if (index(key, three_key) == 1) { print three; next }
+                    if (index(key, pp_key) == 1) { print pp; next }
+                    if (index(key, kx_key) == 1) { print kx; next }
+                    print
+                  }
+                ' "$file" > "${file}.restored"
+                mv "${file}.restored" "$file"
+              fi
+            fi
+          done
+
+      # 需求 7: 打包成兩種版本
+      - name: 7. Package to ZIPs
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          zip -r rime-wanxiang-base.zip . \
+            -x ".git*" -x ".github*" -x "custom_configs*" \
+            -x "wanxiang-lts-zh-hant.gram" -x "rime-wanxiang-full.zip" -x "*LICENSE*"
+            
+          if [ -f "wanxiang-lts-zh-hant.gram" ]; then
+            zip -r rime-wanxiang-full.zip . \
+              -x ".git*" -x ".github*" -x "custom_configs*" \
+              -x "rime-wanxiang-base.zip" -x "*LICENSE*"
+          else
+            echo "警告：找不到大模型檔案，無法產生完整包"
+          fi
+
+      # 需求 8: 提交並推送
+      - name: 8. Commit and Push Source Code
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          grep -qxF "wanxiang-lts-zh-hant.gram" .gitignore || echo "wanxiang-lts-zh-hant.gram" >> .gitignore
+          grep -qxF "rime-wanxiang-base.zip" .gitignore || echo "rime-wanxiang-base.zip" >> .gitignore
+          grep -qxF "rime-wanxiang-full.zip" .gitignore || echo "rime-wanxiang-full.zip" >> .gitignore
+          
+          # 使用 git add -A 確保「檔案刪除」的操作也能被加入 Commit
+          git add -A
+          git commit -m "build: auto generate hant workspace" || echo "No changes"
+          git push origin main
+
+      # 需求 9: 發布 Release
+      - name: 9. Prepare Release Env
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          if [ -f version.txt ]; then
+            VERSION=$(cat version.txt)
+          else
+            VERSION=$(date +'%Y%m%d%H%M')
+          fi
+          echo "RELEASE_VERSION=v$VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TITLE=v$VERSION Rime万象拼音输入方案-繁體詞庫" >> $GITHUB_ENV
+        
+      - name: Release
+        if: steps.check_update.outputs.should_run == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_VERSION }}
+          name: ${{ env.RELEASE_TITLE }}
+          body: |
+            自動編譯同步的客製化繁體 RIME 方案包。
+            
+            📦 **兩種版本供選擇（不含繁體補丁）**
+            - `rime-wanxiang-base.zip`：不含大模型語法包
+            - `rime-wanxiang-full.zip`：包含大模型語法包 (wanxiang-lts-zh-hant.gram)
+            
+            📥 **繁體大模型語法包 官方 Release(必裝)**
+            - [wanxiang-lts-zh-hant.gram](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)：大模型語法包
+            
+            ⚙️ **繁體方案補丁下載（必裝）**：
+            - [wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/wanxiang.custom.yaml)：繁體方案補丁，否則繁體方案無法生效
+            
+          files: |
+            rime-wanxiang-base.zip
+            rime-wanxiang-full.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
