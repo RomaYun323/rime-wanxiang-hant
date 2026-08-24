@@ -1,0 +1,219 @@
+patch:
+  speller/algebra:
+    __patch:
+      - wanxiang_algebra:/base/小鹤双拼
+  grammar/language: wanxiang-lts-zh-hant
+  time_formats: [H:M, H點M分, H:M:S, H時M分S秒, AI:M, I:M P]
+  datetime_formats:
+    - Y-m-d H:M:S
+    - Y-m-dTH:M:S O
+    - YmdHMS
+    - Y年m月d日 H點M分
+    - y/m/d I:M p
+  switches:
+    - name: ascii_mode
+      states: [中文, 英文]
+    - name: ascii_punct
+      states: [中标, 英标]
+    - name: full_shape
+      states: [半角, 全角]
+    - name: emoji
+      states: [表情关, 表情开]
+    - name: chinese_english
+      states: [翻译关, 翻译开]
+    - name: prediction
+      states: [预测关, 预测开]
+    - options:
+        - raw_input
+        - tone_display
+        - full_pinyin
+      states: [原编码, 有声调, 无声调]
+    - options: [t2t, t2s, t2hk, t2tw]
+      states: [通繁, 简体, 港繁, 臺繁]
+      reset: 3
+    - name: abbrev
+      reset: 1
+      states: [简码关, 简码开]
+    - options:
+        - comment_off
+        - tone_hint
+        - toneless_hint
+      states: [注释关, 有声调, 无声调]
+    - name: super_tips
+      states: [提示关, 提示开]
+    - name: charset_filter
+      states: [大字集, 小字集]
+    - name: char_priority
+      states: [词组先, 单字先]
+    - name: english
+      reset: 1
+      states: [英文关, 英文开]
+  key_binder/bindings:
+    - accept: minus
+      send: Page_Up
+      when: has_menu
+    - accept: equal
+      send: Page_Down
+      when: has_menu
+    - accept: Control+Shift+3
+      toggle: ascii_punct
+      when: always
+    - accept: Control+Shift+numbersign
+      toggle: ascii_punct
+      when: always
+    - accept: Control+Shift+4
+      toggle: t2s
+      when: always
+    - accept: Control+Shift+dollar
+      toggle: t2s
+      when: always
+    - accept: Alt+Left
+      send: Shift+Left
+      when: composing
+    - accept: Alt+Right
+      send: Shift+Right
+      when: composing
+    - accept: Control+w
+      send: Control+BackSpace
+      when: composing
+    - accept: Control+e
+      toggle: chinese_english
+      when: has_menu
+    - accept: Control+a
+      toggle: tone_hint
+      when: has_menu
+    - accept: Control+s
+      toggle: tone_display
+      when: has_menu
+    - accept: Control+t
+      toggle: super_tips
+      when: has_menu
+    - accept: Control+g
+      toggle: charset_filter
+      when: has_menu
+    - accept: Control+g
+      toggle: charset_filter
+      when: composing
+    - accept: Shift+space
+      select: .next
+      when: always
+    - accept: Tab
+      send: Control+Right
+      when: has_menu
+    - accept: Tab
+      send: Control+Right
+      when: composing
+    - accept: Control+Tab
+      send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
+      when: composing
+    - accept: /
+      send_sequence: '{space}'
+      match: ^/$
+    - accept: backslash
+      send_sequence: '{Clear}{backslash}'
+      match: ^›+$
+    - accept: comma
+      send_sequence: '{Clear}{comma}'
+      match: ^›+$
+    - accept: period
+      send_sequence: '{Clear}{period}'
+      match: ^›+$
+    - accept: Return
+      send_sequence: '{Clear}{Return}'
+      match: ^›+$
+    - accept: comma
+      send: Page_Up
+      when: paging
+    - accept: period
+      send: Page_Down
+      when: has_menu
+    - accept: semicolon
+      send: '2'
+      when: has_menu
+  super_replacer/rules:
+    - comment_mode: none
+      files:
+        - lua/data/emoji.txt
+      mode: append
+      option: emoji
+      prefix: _em_
+      tags: [abc]
+    - comment_mode: none
+      files:
+        - lua/data/english_chinese.txt
+        - lua/data/chinese_english.txt
+      mode: append
+      option: chinese_english
+      prefix: _en_
+      tags: [abc]
+    - comment_mode: none
+      files:
+        - lua/data/others.txt
+      mode: append
+      option: true
+      prefix: _ot_
+      tags: [abc]
+    - comment_mode: append
+      files:
+        - lua/data/TSCharacters.txt
+        - lua/data/TSPhrases.txt
+      mode: replace
+      option: [t2s]
+      prefix: _t2s_
+      sentence: true
+      tags: [abc]
+    - comment_mode: append
+      files:
+        - lua/data/HKVariants.txt
+      mode: replace
+      option: t2hk
+      prefix: _t2hk_
+      sentence: true
+      tags: [abc]
+    - comment_mode: append
+      files:
+        - lua/data/TWVariants.txt
+      mode: replace
+      option: t2tw
+      prefix: _t2tw_
+      sentence: true
+      tags: [abc]
+    - abbrev_rule: 1,6
+      exclude_types: [pinyin]
+      files:
+        - lua/data/abbrev.txt
+        - lua/data/chengyu.txt
+      mode: abbrev
+      option: abbrev
+      prefix: _abbr_
+      tags: [abc]
+    - abbrev_rule: 1,3
+      files:
+        - lua/data/en_abbrev.txt
+      mode: abbrev
+      option: true
+      prefix: _enabb_
+      tags: [abc]
+    - files:
+        - lua/data/derive.txt
+      mode: append
+      option: true
+      tags: [abc]
+  charset_filter:
+    - addlist:
+        - 诶濛硷氽尛躝〇冇吔磺咗囧屌鲶芶咲畑垅𰻝𰻞龍朙頔雲
+      base: T
+      blacklist: []
+      option: charset_filter
+    - addlist: []
+      base: jg
+      blacklist: []
+      option: t2s
+    - addlist: []
+      base: hT
+      blacklist: []
+      option: t2hk
+    - addlist: []
+      base: fT
+      blacklist: []
+      option: t2tw
