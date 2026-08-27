@@ -25,8 +25,10 @@ jobs:
           name: 萬象輸入法繁體方案補丁
           body: |
             - `wanxiang.custom.yaml`：繁體方案補丁
+            - `default.custom.yaml`：全域選項保存設定
           files: |
             custom_configs/wanxiang.custom.yaml
+            custom_configs/default.custom.yaml
           make_latest: false # 🌟重要：設為 false 避免搶走你主環境包的 Latest 綠色標記
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
