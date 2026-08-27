@@ -1,4 +1,5 @@
 patch:
+  grammar/language: wanxiang-lts-zh-hant
   switches/@7/options: [t2t, t2s, t2hk, t2tw]
   switches/@7/states: [通繁, 简体, 港繁, 臺繁]
   switches/@7/reset: 3
@@ -11,7 +12,6 @@ patch:
   super_replacer/rules/@4/prefix: _t2hk_
   super_replacer/rules/@5/option: [t2tw]
   super_replacer/rules/@5/prefix: _t2tw_
-  grammar/language: wanxiang-lts-zh-hant
   time_formats: [H:M, H點M分, H:M:S, H時M分S秒, AI:M, I:M P]
   datetime_formats:
     - Y-m-d H:M:S
