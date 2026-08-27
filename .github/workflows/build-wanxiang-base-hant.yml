@@ -277,7 +277,7 @@ jobs:
             
             ⚙️ **繁體方案補丁下載（必裝）**：
             - [wanxiang.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/wanxiang.custom.yaml)：繁體方案補丁，否則繁體方案無法生效
-            - [default.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/default.custom.yaml)：繁體方案補丁，否則繁體方案無法生效
+            - [default.custom.yaml](https://github.com/${{ github.repository }}/releases/download/custom-configs/default.custom.yaml)：全域選項保存設定
             
           files: |
             rime-wanxiang-base.zip
