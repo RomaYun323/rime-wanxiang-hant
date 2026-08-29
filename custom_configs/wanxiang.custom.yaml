@@ -21,7 +21,6 @@ patch:
     - y/m/d I:M p
   key_binder/bindings/@4/toggle: t2s
   key_binder/bindings/@5/toggle: t2s
-  translator/packs: [contacts]
   charset_filter/@0/base: T
   charset_filter/@1/base: jg
   charset_filter/@1/option: t2s
