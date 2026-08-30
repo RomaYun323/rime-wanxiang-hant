@@ -25,7 +25,7 @@ local ONE_PREFIX = "1" .. KEY_SEP
 local TWO_PREFIX = "2" .. KEY_SEP
 local RECORD_SEPARATOR = " \t"
 local C_MAX = 2147483000
-local FILTER_SCAN_LIMIT = 100
+local FILTER_SCAN_LIMIT = 50
 local MEMORY_GROUP_LIMIT = 10
 local NUMBER_CONTEXT = "#NUM"
 local DEFAULT_CLASSIFIERS = "百千万亿个多只名位口头匹条群批伙张把件台部块根颗粒滴片朵面扇顶栋座所辆艘架盏支枝杆双对副套打串束排阵堆叠摞扎杯瓶盒包份碗锅盆桶袋罐盘次场局回趟顿番遍声项宗桩款步招年月天周岁秒分刻代期届任夜季本册篇首句段卷幅节堂门帖字行米寸尺里斤两吨克升元角毛笔"
@@ -47,6 +47,7 @@ local context_state = {
     learn_allow_new = false,
     learn_context1 = nil,
     learn_context2 = nil,
+    learn_front = {},
     learn_ready = false,
 }
 
@@ -72,6 +73,7 @@ local function clear_learning_snapshot()
     context_state.learn_allow_new = false
     context_state.learn_context1 = nil
     context_state.learn_context2 = nil
+    clear_table(context_state.learn_front)
     context_state.learn_ready = false
 end
 
@@ -161,9 +163,6 @@ end
 local function next_active_commits(commits)
     commits = commits or 0
 
-    -- 负 c 是删除墓碑，不继承删除前的历史强度。
-    -- 用户重新选择该词时视为一次全新的学习，从 c=1 重新开始；
-    -- 否则 -9 -> abs(-9)+1 -> 10 会让刚复活的词直接冲到前列。
     if commits < 0 then return 1 end
     if commits >= C_MAX then return C_MAX end
     return commits + 1
@@ -245,19 +244,26 @@ end
 
 -- 读取某个候选在当前上下文中的 2-Gram / 1-Gram 次数。
 -- 只做精确 fetch，不再扫描某个上文的全部历史分支。
-local function get_context_counts(db, text, context2, context1)
-    if not db or not text or text == "" or not context1 then return 0, 0 end
+local function get_context_counts_by_code(db, text, code2, code1)
+    if not db or not text or text == "" or not code1 then return 0, 0 end
 
-    local c1 = select(1, fetch_record(db, ONE_PREFIX .. context1, text))
+    local c1 = select(1, fetch_record(db, code1, text))
     local c2 = 0
-    if context2 then c2 = select(1, fetch_record(db, TWO_PREFIX .. context2 .. KEY_SEP .. context1, text)) end
+    if code2 then c2 = select(1, fetch_record(db, code2, text)) end
     if c1 < 0 then c1 = 0 end
     if c2 < 0 then c2 = 0 end
     return c2, c1
 end
 
--- F 每轮只保存“当前同编码候选组”中已经存在记忆的词。
--- 达到 10 个后只禁止新增第 11 个；已有词仍允许继续 c+1。
+local function get_context_counts(db, text, context2, context1)
+    if not context1 then return 0, 0 end
+    local code1 = ONE_PREFIX .. context1
+    local code2 = context2 and (TWO_PREFIX .. context2 .. KEY_SEP .. context1) or nil
+    return get_context_counts_by_code(db, text, code2, code1)
+end
+
+-- F 每轮保存当前同编码候选组的已知词、可新增词和最终首位。
+-- 达到 10 个后只禁止新增第 11 个；已有词只有掉出首位后才继续增长。
 local function begin_learning_snapshot(context2, context1)
     clear_learning_snapshot()
     context_state.learn_context2 = context2
@@ -274,6 +280,10 @@ local function remember_snapshot_candidate(text, is_known)
         context_state.learn_match_count = context_state.learn_match_count + 1
         context_state.learn_allow_new = context_state.learn_match_count < MEMORY_GROUP_LIMIT
     end
+end
+
+local function mark_learning_front(text)
+    if text and text ~= "" then context_state.learn_front[text] = true end
 end
 
 local function clear_undo(env)
@@ -365,22 +375,46 @@ function P.init(env)
                 local snapshot_matches = context_state.learn_ready
                     and context_state.learn_context1 == context1
                     and context_state.learn_context2 == context2
-                local already_known = snapshot_matches and context_state.learn_known[text] or false
 
-                -- 即使候选位于本轮 100 项预读之外，已有记忆也必须继续 c+1。
-                if not already_known then
-                    local c2, c1 = get_context_counts(db, text, context2, context1)
-                    already_known = c2 > 0 or c1 > 0
-                end
+                -- commit 只发生一次，直接精确读取当前 1/2-Gram，避免“只存在其中一条”
+                -- 被 already_known 合并后误伤另一条的第一次建档。
+                local c2, c1 = get_context_counts(db, text, context2, context1)
+                local known1 = c1 > 0
+                local known2 = context2 ~= nil and c2 > 0
+                local already_known = known1 or known2
 
                 -- “10”只限制当前同编码候选组新增第 11 个分支；
                 -- 新词必须确实出现在本轮 F 扫描的同码组里，避免旁路提交误写。
                 local can_add = snapshot_matches
                     and context_state.learn_allow_new
                     and context_state.learn_seen[text] == true
-                if already_known or can_add then
+
+                local at_front = snapshot_matches
+                    and context_state.learn_front[text] == true
+
+                if not already_known then
+                    -- 整个词第一次记忆：不受懒增长影响，仍按原规则建立 c=1。
+                    if can_add then
+                        update_memory_record(db, env.undo_before, env.undo_after, ONE_PREFIX .. context1, text)
+                        if context2 then
+                            update_memory_record(db, env.undo_before, env.undo_after, TWO_PREFIX .. context2 .. KEY_SEP .. context1, text)
+                        end
+                    end
+                elseif at_front then
+                    -- 已有记忆且位置已稳定：现有 c 不增长，但缺失的另一层 Gram
+                    -- 仍允许第一次建档，避免 1-Gram/2-Gram 互相遮蔽。
+                    if not known1 then
+                        update_memory_record(db, env.undo_before, env.undo_after, ONE_PREFIX .. context1, text)
+                    end
+                    if context2 and not known2 then
+                        update_memory_record(db, env.undo_before, env.undo_after, TWO_PREFIX .. context2 .. KEY_SEP .. context1, text)
+                    end
+                else
+                    -- 仍未到稳定位置：沿用原行为继续学习；缺失层也会自然从 c=1 建起。
                     update_memory_record(db, env.undo_before, env.undo_after, ONE_PREFIX .. context1, text)
-                    if context2 then update_memory_record(db, env.undo_before, env.undo_after, TWO_PREFIX .. context2 .. KEY_SEP .. context1, text) end
+                    if context2 then
+                        update_memory_record(db, env.undo_before, env.undo_after, TWO_PREFIX .. context2 .. KEY_SEP .. context1, text)
+                    end
                 end
             end
         end
@@ -393,8 +427,6 @@ function P.init(env)
         clear_learning_snapshot()
     end
 
-    -- 原生候选删除回调：前端 UI“删除/忘记”和 PC 原生删词快捷键共用此事件。
-    --这里只清理 context_reorder 自己的记忆，不主动执行删词，也不捕获任何删除快捷键。
     env.delete_cb = function(ctx)
         local comp = ctx.composition
         if not comp or comp:empty() then return end
@@ -422,14 +454,8 @@ function P.init(env)
             end
         end
 
-        -- 删除只撤销 context_reorder 对当前词的上下文加权，不清空上文。
-        -- 丢弃本轮扫描快照后立即刷新未确认 composition：F 会沿用同一个
-        -- prev2 / prev1（或数字量词上下文）重新读取 c。被删除词因 c<=0
-        -- 回到原生候选相对位置，其余仍有记忆的候选继续保持上下文调频。
         clear_learning_snapshot()
 
-        -- delete_notifier 可能由 PC 原生快捷键或移动端 UI 触发。这里不模拟按键，
-        -- 只请求 Rime 重建当前未确认候选菜单。用 guard 防止前端/插件异常重入。
         if not env.delete_refreshing and ctx:is_composing() then
             env.delete_refreshing = true
             pcall(function() ctx:refresh_non_confirmed_composition() end)
@@ -500,20 +526,52 @@ function P.fini(env)
     release_db(env)
 end
 
--- Filter：只调整原生候选，不生成预测 Candidate。
 local F = {}
 
 function F.init(env)
     load_config(env)
 end
 
--- 从同一个 Translation 预读当前同编码候选组。
--- Candidate 只保存在本次 Filter 调用内的局部表中，最多 100 项。
--- 即使已命中 10 个也继续排序，10 只控制是否允许新增。
-local function collect_scored_prefix(next_candidate, db, context2, context1, classifier_mode, limit)
+local function make_candidate_reader(input)
+    local iterator, iterator_state, iterator_control = input:iter()
+    local exhausted = false
+
+    return function()
+        if exhausted then return nil end
+        local cand = iterator(iterator_state, iterator_control)
+        iterator_control = cand
+        if not cand then exhausted = true end
+        return cand
+    end
+end
+
+local function has_at_least_utf8_chars(text, count)
+    if not text or text == "" then return false end
+    local pos = utf8.offset(text, count)
+    return pos ~= nil and pos <= #text
+end
+
+local function protect_first_candidate(cand)
+    if not cand then return false end
+    local cand_type = cand.type or ""
+    local text = cand.text or ""
+    if cand_type == "sentence" then
+        return has_at_least_utf8_chars(text, 2)
+    end
+    if cand_type == "phrase" or cand_type == "user_phrase" then
+        return has_at_least_utf8_chars(text, 4)
+    end
+    return false
+end
+
+local function collect_scored_prefix(next_candidate, db, code2, code1, classifier_mode, limit, target_end)
     local entries = {}
     local boundary_cand = nil
-    local target_end = nil
+    local first_classifier = nil
+    local first_tier = nil
+    local first_c2 = nil
+    local first_c1 = nil
+    local needs_sort = false
 
     while #entries < limit do
         local cand = next_candidate()
@@ -521,31 +579,50 @@ local function collect_scored_prefix(next_candidate, db, context2, context1, cla
 
         local cand_type = cand.type or ""
         if #entries == 0 then
-            if not REORDER_TYPE_WHITELIST[cand_type] then
+            if not REORDER_TYPE_WHITELIST[cand_type]
+                or (target_end ~= nil and cand._end ~= target_end)
+            then
                 boundary_cand = cand
                 break
             end
-            target_end = cand._end
+            if target_end == nil then target_end = cand._end end
         elseif not REORDER_TYPE_WHITELIST[cand_type] or cand._end ~= target_end then
             boundary_cand = cand
             break
         end
 
         local text = cand.text or ""
-        local c2, c1 = get_context_counts(db, text, context2, context1)
+        local c2, c1 = get_context_counts_by_code(db, text, code2, code1)
+        local classifier = classifier_mode and CLASSIFIER_LOOKUP[text] or false
+        local tier = c2 > 0 and 2 or (c1 > 0 and 1 or 0)
         local index = #entries + 1
+
+        if index == 1 then
+            first_classifier = classifier
+            first_tier = tier
+            first_c2 = c2
+            first_c1 = c1
+        elseif not needs_sort and (
+            classifier ~= first_classifier
+            or tier ~= first_tier
+            or c2 ~= first_c2
+            or c1 ~= first_c1
+        ) then
+            needs_sort = true
+        end
 
         entries[index] = {
             cand = cand,
             c2 = c2,
             c1 = c1,
-            classifier = classifier_mode and CLASSIFIER_LOOKUP[text] or false,
+            classifier = classifier,
+            tier = tier,
             raw_index = index,
         }
         remember_snapshot_candidate(text, c2 > 0 or c1 > 0)
     end
 
-    return entries, boundary_cand
+    return entries, boundary_cand, needs_sort
 end
 
 local function sort_scored_prefix(entries, classifier_mode)
@@ -553,10 +630,7 @@ local function sort_scored_prefix(entries, classifier_mode)
         if classifier_mode and a.classifier ~= b.classifier then
             return a.classifier
         end
-
-        local at = a.c2 > 0 and 2 or (a.c1 > 0 and 1 or 0)
-        local bt = b.c2 > 0 and 2 or (b.c1 > 0 and 1 or 0)
-        if at ~= bt then return at > bt end
+        if a.tier ~= b.tier then return a.tier > b.tier end
         if a.c2 ~= b.c2 then return a.c2 > b.c2 end
         if a.c1 ~= b.c1 then return a.c1 > b.c1 end
         return a.raw_index < b.raw_index
@@ -575,27 +649,13 @@ function F.func(input, env)
         return
     end
 
-    -- 上文状态在“下一次真实 commit”之前必须保持稳定。
-    -- Filter 可能因为翻页、选中变化、super_sequence 手动调序等原因被反复刷新；
-    -- 这些 refresh 都不是新的语言上下文，不能在这里按墙钟时间 reset_context()。
-    -- context_timeout 只在 commit_cb 中比较“前后两次真实 commit”的时间间隔。
     local context1 = do_classifier and NUMBER_CONTEXT or context_state.prev1
     local context2 = do_classifier and nil or context_state.prev2
     local do_context = context1 ~= nil
 
-    local iterator, iterator_state, iterator_control = input:iter()
-    local exhausted = false
-    local function next_candidate()
-        if exhausted then return nil end
-        local cand = iterator(iterator_state, iterator_control)
-        iterator_control = cand
-        if not cand then exhausted = true end
-        return cand
-    end
-
-    -- 回头码优先级最高：只交换前两个同段合法候选，不建立任何 Candidate 缓存。
     if do_fallback then
         clear_learning_snapshot()
+        local next_candidate = make_candidate_reader(input)
         local c1 = next_candidate()
         if not c1 then return end
         local c2 = next_candidate()
@@ -617,15 +677,56 @@ function F.func(input, env)
         return
     end
 
+    local next_candidate = make_candidate_reader(input)
+    local code1 = ONE_PREFIX .. context1
+    local code2 = context2 and (TWO_PREFIX .. context2 .. KEY_SEP .. context1) or nil
     begin_learning_snapshot(context2, context1)
-    local entries, boundary_cand = collect_scored_prefix(
-        next_candidate, db, context2, context1, do_classifier, FILTER_SCAN_LIMIT
-    )
-    sort_scored_prefix(entries, do_classifier)
 
-    for _, entry in ipairs(entries) do yield(entry.cand) end
+    local first = next_candidate()
+    if not first then return end
+
+    local protected_first = protect_first_candidate(first)
+    local protected_learnable = protected_first
+        and REORDER_TYPE_WHITELIST[first.type or ""] == true
+    local scan_limit = FILTER_SCAN_LIMIT
+    local target_end = nil
+    local yielded_first = false
+
+    if protected_first then
+        target_end = first._end
+        scan_limit = scan_limit - 1
+
+        if protected_learnable then
+            local text = first.text or ""
+            local c2, c1 = get_context_counts_by_code(db, text, code2, code1)
+            remember_snapshot_candidate(text, c2 > 0 or c1 > 0)
+            mark_learning_front(text)
+        else
+            yield(first)
+            yielded_first = true
+        end
+    else
+        local pending = first
+        local upstream = next_candidate
+        next_candidate = function()
+            if pending then
+                local cand = pending
+                pending = nil
+                return cand
+            end
+            return upstream()
+        end
+    end
+
+    local entries, boundary_cand, needs_sort = collect_scored_prefix(
+        next_candidate, db, code2, code1, do_classifier, scan_limit, target_end
+    )
+    if needs_sort then sort_scored_prefix(entries, do_classifier) end
+    if entries[1] then mark_learning_front(entries[1].cand.text or "") end
+    if protected_first and not yielded_first then yield(first) end
+    for i = 1, #entries do yield(entries[i].cand) end
     if boundary_cand then yield(boundary_cand) end
-    while not exhausted do local cand = next_candidate(); if not cand then break end; yield(cand) end
+    while true do local cand = next_candidate(); if not cand then break end; yield(cand) end
 end
 
 function F.fini(env)
