@@ -24,15 +24,16 @@ local KEY_SEP = ";"
 local ONE_PREFIX = "1" .. KEY_SEP
 local TWO_PREFIX = "2" .. KEY_SEP
 local RECORD_SEPARATOR = " \t"
-local C_MAX = 2147483000
+local MAX_COMMIT_COUNT = 2147483000
 local FILTER_SCAN_LIMIT = 50
 local MEMORY_GROUP_LIMIT = 10
 local NUMBER_CONTEXT = "#NUM"
+local OPTION_NAME = "context_reorder"
 local DEFAULT_CLASSIFIERS = "百千万亿个多只名位口头匹条群批伙张把件台部块根颗粒滴片朵面扇顶栋座所辆艘架盏支枝杆双对副套打串束排阵堆叠摞扎杯瓶盒包份碗锅盆桶袋罐盘次场局回趟顿番遍声项宗桩款步招年月天周岁秒分刻代期届任夜季本册篇首句段卷幅节堂门帖字行米寸尺里斤两吨克升元角毛笔"
 local CLASSIFIER_LOOKUP = {}
 local CONFIG = {
     CONTEXT_TIMEOUT_MS = 5000,
-    ENABLE_FALLBACK_REORDER = true,
+    ENABLE_FALLBACK_REORDER = false,
 }
 local context_state = {
     prev2 = nil,
@@ -82,6 +83,13 @@ local function reset_context()
     context_state.prev1 = nil
     context_state.last_commit_time = 0
     clear_learning_snapshot()
+end
+
+local function reset_runtime_state()
+    reset_context()
+    context_state.after_number = false
+    context_state.reverted_code = ""
+    context_state.is_backspacing = false
 end
 
 local function build_classifier_lookup(text)
@@ -144,7 +152,7 @@ local function parse_record_tail(tail)
 end
 
 local function make_record_tail(commits)
-    commits = math_max(-C_MAX, math_min(C_MAX, commits or 0))
+    commits = math_max(-MAX_COMMIT_COUNT, math_min(MAX_COMMIT_COUNT, commits or 0))
     return s_format("c=%d d=0 t=0", commits)
 end
 
@@ -164,7 +172,7 @@ local function next_active_commits(commits)
     commits = commits or 0
 
     if commits < 0 then return 1 end
-    if commits >= C_MAX then return C_MAX end
+    if commits >= MAX_COMMIT_COUNT then return MAX_COMMIT_COUNT end
     return commits + 1
 end
 
@@ -181,7 +189,8 @@ local function update_memory_record(db, before, after, code, word)
 end
 
 -- 原生删词事件同步到上下文数据库。
--- 不监听 Ctrl+Del / Shift+Del；PC 快捷键和移动端 UI 都由 delete_notifier 统一触发。
+-- 不监听、不接管 Ctrl+Del / Shift+Del；PC 快捷键和移动端 UI 都由 delete_notifier 统一触发。
+-- delete_cb 只同步 DB 并设置延迟刷新标记；真正刷新放到下一次 processor 事件。
 -- 使用负 c 墓碑而不是 erase，保留 UserDb 同步时的删除语义。
 local function mark_record_deleted(db, code, word)
     if not db or not code or code == "" or not word or word == "" then return false end
@@ -189,7 +198,7 @@ local function mark_record_deleted(db, code, word)
     if not raw_key or not tail then return false end
 
     local magnitude = math_abs(commits or 0)
-    if magnitude < C_MAX then magnitude = magnitude + 1 end
+    if magnitude < MAX_COMMIT_COUNT then magnitude = magnitude + 1 end
     if magnitude == 0 then magnitude = 1 end
     return db:update(raw_key, make_record_tail(-magnitude))
 end
@@ -324,13 +333,12 @@ local function rollback_last_commit(env)
     return true
 end
 
--- Processor：只负责真实上屏学习、维护两级上下文和立即退格回滚。
+-- Processor：负责上屏学习、上下文状态维护及回滚处理。
 local P = {}
 
 function P.init(env)
     load_config(env)
-    env.delete_refreshing = nil
-    if not get_db(env) then return end
+    env.need_delete_refresh = false
 
     env.is_t9 = wanxiang.get_input_method_type and wanxiang.get_input_method_type(env) == "t9" or false
     env.undo_before = {}
@@ -338,7 +346,13 @@ function P.init(env)
     clear_undo(env)
 
     env.commit_cb = function(ctx)
-            local text = ctx:get_commit_text()
+        if not ctx:get_option(OPTION_NAME) then
+            reset_runtime_state()
+            clear_undo(env)
+            return
+        end
+
+        local text = ctx:get_commit_text()
         local current_time = now_ms()
 
         context_state.reverted_code = ""
@@ -428,38 +442,48 @@ function P.init(env)
     end
 
     env.delete_cb = function(ctx)
-        local comp = ctx.composition
-        if not comp or comp:empty() then return end
+        if not ctx:get_option(OPTION_NAME) then return end
 
-        local seg = comp:back()
-        if not seg then return end
-        local cand = seg:get_candidate_at(seg.selected_index)
-        if not cand or not REORDER_TYPE_WHITELIST[cand.type or ""] then return end
-
-        local word = cand.text or ""
-        if word == "" then return end
-
-        local db = get_db(env)
-        if not db then return end
-
-        if context_state.after_number then
-            -- 数字后的量词记忆只有 1-Gram 数字上下文。
-            mark_record_deleted(db, ONE_PREFIX .. NUMBER_CONTEXT, word)
-        else
-            local context1 = context_state.prev1
-            local context2 = context_state.prev2
-            if context1 then
-                mark_record_deleted(db, ONE_PREFIX .. context1, word)
-                if context2 then mark_record_deleted(db, TWO_PREFIX .. context2 .. KEY_SEP .. context1, word) end
-            end
+        -- delete_notifier 仍处于原生删词链内部：
+        -- 这里只记录“稍后刷新”，绝不直接修改 Context / Composition。
+        -- 无论本脚本自己的 DB 同步是否成功，都不能影响 Rime 原生删词链。
+        if ctx and ctx:is_composing() then
+            env.need_delete_refresh = true
         end
 
+        local ok, err = pcall(function()
+            -- DeleteCandidate() 在触发 delete_notifier 前已经设置 selected_index，
+            -- 直接读取当前选中候选即可，不需要手动操作 composition。
+            local cand = ctx and ctx:get_selected_candidate() or nil
+            if not cand or not REORDER_TYPE_WHITELIST[cand.type or ""] then return end
+
+            local word = cand.text or ""
+            if word == "" then return end
+
+            local db = get_db(env)
+            if not db then return end
+
+            if context_state.after_number then
+                -- 数字后的量词记忆只有 1-Gram 数字上下文。
+                mark_record_deleted(db, ONE_PREFIX .. NUMBER_CONTEXT, word)
+            else
+                local context1 = context_state.prev1
+                local context2 = context_state.prev2
+                if context1 then
+                    mark_record_deleted(db, ONE_PREFIX .. context1, word)
+                    if context2 then
+                        mark_record_deleted(db, TWO_PREFIX .. context2 .. KEY_SEP .. context1, word)
+                    end
+                end
+            end
+        end)
+
+        -- 当前候选流已经发生删除事件，本轮学习快照作废；
+        -- 下一次 refresh 后 F 会按新候选重新建立。
         clear_learning_snapshot()
 
-        if not env.delete_refreshing and ctx:is_composing() then
-            env.delete_refreshing = true
-            pcall(function() ctx:refresh_non_confirmed_composition() end)
-            env.delete_refreshing = nil
+        if not ok then
+            log.error("context_reorder delete sync error: " .. tostring(err))
         end
     end
 
@@ -468,10 +492,30 @@ function P.init(env)
 end
 
 function P.func(key, env)
+    local ctx = env.engine.context
+
+    if not ctx:get_option(OPTION_NAME) then
+        reset_runtime_state()
+        clear_undo(env)
+        env.need_delete_refresh = false
+        return 2
+    end
+
+    -- 原生删词已经完成后，再在下一次按键事件里刷新当前 composition。
+    -- PC 上通常下一事件就是 Ctrl/Del 的 release，因此刷新几乎立即发生，
+    -- 但已经完全退出 delete_notifier 分发链。
+    if env.need_delete_refresh then
+        env.need_delete_refresh = false
+        if ctx and ctx:is_composing() then
+            pcall(function()
+                ctx:refresh_non_confirmed_composition()
+            end)
+        end
+    end
+
     if key:release() then return 2 end
 
     local repr = key:repr()
-    local ctx = env.engine.context
     local is_composing = ctx:is_composing()
     local is_backspace = repr == "BackSpace"
     local has_modifier = not is_backspace and (s_find(repr, "Shift", 1, true) or s_find(repr, "Control", 1, true) or s_find(repr, "Alt", 1, true))
@@ -508,7 +552,7 @@ function P.fini(env)
 
     env.commit_cb = nil
     env.delete_cb = nil
-    env.delete_refreshing = nil
+    env.need_delete_refresh = nil
     env.undo_before = nil
     env.undo_after = nil
     env.undo_prev2 = nil
@@ -519,10 +563,7 @@ function P.fini(env)
     env.last_action_time = nil
     env.is_t9 = nil
 
-    context_state.after_number = false
-    context_state.reverted_code = ""
-    context_state.is_backspacing = false
-    reset_context()
+    reset_runtime_state()
     release_db(env)
 end
 
@@ -639,6 +680,13 @@ end
 
 function F.func(input, env)
     local ctx = env.engine.context
+
+    if not ctx:get_option(OPTION_NAME) then
+        reset_runtime_state()
+        for cand in input:iter() do yield(cand) end
+        return
+    end
+
     local current_input = ctx.input or ""
     local do_classifier = context_state.after_number and next(CLASSIFIER_LOOKUP) ~= nil
     local do_fallback = CONFIG.ENABLE_FALLBACK_REORDER and current_input ~= "" and current_input == context_state.reverted_code
@@ -656,10 +704,16 @@ function F.func(input, env)
     if do_fallback then
         clear_learning_snapshot()
         local next_candidate = make_candidate_reader(input)
-        local c1 = next_candidate()
-        if not c1 then return end
-        local c2 = next_candidate()
-        if c2 and REORDER_TYPE_WHITELIST[c1.type or ""] and REORDER_TYPE_WHITELIST[c2.type or ""] and c1._end == c2._end then yield(c2); yield(c1) else yield(c1); if c2 then yield(c2) end end
+        local first = next_candidate()
+        if not first then return end
+        local second = next_candidate()
+        if second and REORDER_TYPE_WHITELIST[first.type or ""] and REORDER_TYPE_WHITELIST[second.type or ""] and first._end == second._end then
+            yield(second)
+            yield(first)
+        else
+            yield(first)
+            if second then yield(second) end
+        end
         while true do local cand = next_candidate(); if not cand then break end; yield(cand) end
         return
     end
