@@ -114,7 +114,7 @@ jobs:
           rm -rf ./dicts
           cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
 
-      # 需求 4: 處理 OpenCC Dicts (還原為你最初的 \\t 寫法)
+      # 需求 4: 處理 OpenCC Dicts（將空格替換為實際 Tab）
       - name: 4. Process OpenCC Dicts
         if: steps.check_update.outputs.should_run == 'true'
         run: |
@@ -122,8 +122,9 @@ jobs:
           curl -sL https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/TSPhrases.txt -o TSPhrases.txt
           sed -i '/^#/d' TSPhrases.txt
           sed -i '/^#/d' TSCharacters.txt
-          sed -i 's/ /\\t/g' TSPhrases.txt
-          sed -i 's/ /\\t/g' TSCharacters.txt
+          TAB=$(printf '\t')
+          sed -i "s/ /${TAB}/g" TSPhrases.txt
+          sed -i "s/ /${TAB}/g" TSCharacters.txt
           grep -v '^[[:space:]]*$' TSPhrases.txt > TSPhrases_clean.txt && mv TSPhrases_clean.txt TSPhrases.txt
           grep -v '^[[:space:]]*$' TSCharacters.txt > TSCharacters_clean.txt && mv TSCharacters_clean.txt TSCharacters.txt
           mkdir -p lua/data/
