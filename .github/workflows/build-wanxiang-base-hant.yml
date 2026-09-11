@@ -114,6 +114,12 @@ jobs:
           rm -rf ./dicts
           cp -r /tmp/RIME-LMDG/dicts_hant ./dicts
 
+      # 需求 3.1: 修正 wuzhong.dict.yaml 的虱目魚用字
+      - name: 3.1. Fix milkfish spelling in wuzhong.dict.yaml
+        if: steps.check_update.outputs.should_run == 'true'
+        run: |
+          sed -i 's/蝨目魚/虱目魚/g' ./dicts/wuzhong.dict.yaml
+
       # 需求 4: 處理 OpenCC Dicts（將空格替換為實際 Tab）
       - name: 4. Process OpenCC Dicts
         if: steps.check_update.outputs.should_run == 'true'
