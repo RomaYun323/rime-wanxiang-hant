@@ -21,4 +21,4 @@
 
 每次抓取方案上游的 `wanxiang-base` 分支及 RIME-LMDG 的 `wanxiang` 分支最新快照，`build-info.json` 記錄實際提交。建置腳本先檢查字典、附屬方案與 OpenCC 依賴；有缺漏就停止，不發布不完整套件。修改腳本後仍應以實際 Rime 重新部署、測試候選與切換行為。
 
-OpenCC 標準轉換詞典優先沿用萬象已有檔案；缺少的 `STCharacters`、`STPhrases`、`TSCharacters`、`TSPhrases`、`HKVariants`、`TWVariants` 從 [OpenCC 官方文字詞典](https://github.com/BYVoid/OpenCC/tree/master/data/dictionary) 補齊，清除註解及空行後以 `opencc_dict` 編譯為 `.ocd2`。臺灣字形客製在編譯前套用；emoji 等萬象專用詞典仍由萬象提供。
+OpenCC 標準轉換詞典優先沿用萬象已有檔案；缺少的 `TSCharacters`、`TSPhrases`、`HKVariants`、`TWVariants` 從 [OpenCC 官方文字詞典](https://github.com/BYVoid/OpenCC/tree/master/data/dictionary) 補齊，清除註解及空行後以 `opencc_dict` 編譯為 `.ocd2`。臺灣字形客製在編譯前套用；emoji 先解碼為文字、轉繁，再編譯回 `.ocd2`。編譯後刪除中間 TXT，僅調整建置結果中的 JSON 引用，`custom_configs/` 原檔不變。缺少 `Custom_TSPhrases.txt` 時由 `Custom_STPhrases.txt` 的對照反向建立，保留 `Custom_TSPhrases.txt` 與 `Custom_Emoji.txt`；移除 `Custom_STPhrases.txt` 及 `STPhrases`、`STCharacters` 的文字檔與 `.ocd2`。
