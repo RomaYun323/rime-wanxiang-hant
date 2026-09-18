@@ -274,7 +274,7 @@ def build(args):
         for kind in ("base", "full"):
             with zipfile.ZipFile(args.archives / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
                 for path in sorted(root.rglob("*")):
-                    if path.is_file() and not (kind == "base" and path.suffix == ".gram"):
+                    if path.is_file() and path.name != "build-info.json" and not (kind == "base" and path.suffix == ".gram"):
                         archive.write(path, path.relative_to(root))
     print("Traditional build and dependency checks passed:", root)
 

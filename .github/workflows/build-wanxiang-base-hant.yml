@@ -66,7 +66,7 @@ jobs:
           for kind in ("base", "full"):
               with zipfile.ZipFile(packages / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
                   for path in sorted(root.rglob("*")):
-                      if path.is_file() and not (kind == "base" and path.suffix == ".gram"):
+                      if path.is_file() and path.name != "build-info.json" and not (kind == "base" and path.suffix == ".gram"):
                           archive.write(path, path.relative_to(root))
           PY
 
@@ -103,7 +103,7 @@ jobs:
             - rime-wanxiang-base.zip：不含語言模型，另放入 wanxiang-lts-zh-hant.gram。
             - rime-wanxiang-full.zip：包含繁體語言模型。
             升級前請備份並合併個人 custom 設定；請移除舊版針對 super_replacer 的繁體補丁。
-            build-info.json 記錄本次上游與詞庫來源提交。
+            建置目錄的 build-info.json 記錄本次上游與詞庫來源提交，不包含於 ZIP。
           files: |
             ${{ runner.temp }}/packages/rime-wanxiang-base.zip
             ${{ runner.temp }}/packages/rime-wanxiang-full.zip
