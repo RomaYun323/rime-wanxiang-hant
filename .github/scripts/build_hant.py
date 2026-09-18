@@ -180,12 +180,11 @@ def build(args):
     if compiled_emoji.is_file():
         subprocess.run(["opencc_dict", "-i", str(compiled_emoji), "-o", str(emoji),
                         "-f", "ocd2", "-t", "text"], check=True)
-    # Upstream may ship only text; merge user additions before converting to Traditional.
-    emoji_source = read(emoji)
+    # Upstream may ship only text; convert it before adding user-defined aliases.
+    lines = convert(read(emoji), "s2t.json").splitlines()
     emoji_additions = custom / "emoji新增.txt"
     if emoji_additions.is_file():
-        emoji_source += "\n" + read(emoji_additions)
-    lines = convert(emoji_source, "s2t.json").splitlines()
+        lines.extend(read(emoji_additions).splitlines())
     # Different Simplified keys can become the same Traditional key.
     mapping = {}
     for line in lines:
