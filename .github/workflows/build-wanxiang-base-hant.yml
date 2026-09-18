@@ -98,12 +98,21 @@ jobs:
           name: ${{ steps.source.outputs.tag }} Rime万象拼音输入方案-繁體詞庫
           fail_on_unmatched_files: true
           body: |
-            上游 wanxiang-base 方案搭配 RIME-LMDG 官方 dicts_hant 繁體詞庫，不包含 plum 安裝工具。
-            保留上游 schema 原檔，主目錄不附帶 custom 補丁；個人繁體設定請自行套用。
-            - rime-wanxiang-base.zip：不含語言模型，另放入 wanxiang-lts-zh-hant.gram。
-            - rime-wanxiang-full.zip：包含繁體語言模型。
-            升級前請備份並合併個人 custom 設定；請移除舊版針對 super_replacer 的繁體補丁。
-            建置目錄的 build-info.json 記錄本次上游與詞庫來源提交，不包含於 ZIP。
+            自動編譯同步的客製化繁體 RIME 方案包。
+
+            📦 **兩種版本供選擇（不含繁體補丁）**
+
+            - `rime-wanxiang-base.zip`：不含大模型語法包
+            - `rime-wanxiang-full.zip`：包含大模型語法包 (wanxiang-lts-zh-hant.gram)
+
+            📥 **繁體大模型語法包 官方 Release(必裝)**
+
+            - [wanxiang-lts-zh-hant.gram](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)：大模型語法包
+
+            ⚙️ **繁體方案補丁下載（必裝）**：
+
+            - [wanxiang.custom.yaml](https://github.com/RomaYun323/rime-wanxiang-hant/releases/download/custom-configs/wanxiang.custom.yaml)：繁體方案補丁，否則繁體方案無法生效
+            - [default.custom.yaml](https://github.com/RomaYun323/rime-wanxiang-hant/releases/download/custom-configs/default.custom.yaml)：全域選項保存設定
           files: |
             ${{ runner.temp }}/packages/rime-wanxiang-base.zip
             ${{ runner.temp }}/packages/rime-wanxiang-full.zip
