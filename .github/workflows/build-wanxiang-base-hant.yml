@@ -2,6 +2,8 @@ name: Build wanxiang-base-hant
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '0 0 * * *'
 
 permissions:
   contents: write
@@ -89,6 +91,39 @@ jobs:
           VERSION=$(tr -d '\r\n' < version.txt)
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether config release needs updating
+        id: configs
+        run: |
+          git fetch --force origin refs/tags/custom-configs:refs/tags/custom-configs || true
+          if ! git rev-parse --verify --quiet refs/tags/custom-configs; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet custom-configs HEAD -- \
+            custom_configs/wanxiang.custom.yaml custom_configs/default.custom.yaml; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update custom configs tag
+        if: steps.configs.outputs.publish == 'true'
+        run: |
+          git tag -f custom-configs "${{ steps.source.outputs.sha }}"
+          git push -f origin custom-configs
+
+      - name: Publish updated config files
+        if: steps.configs.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-configs
+          name: 萬象輸入法繁體方案補丁
+          make_latest: false
+          body: |
+            - `wanxiang.custom.yaml`：繁體方案補丁
+            - `default.custom.yaml`：全域選項保存設定
+          files: |
+            custom_configs/wanxiang.custom.yaml
+            custom_configs/default.custom.yaml
 
       - name: Publish Traditional packages
         uses: softprops/action-gh-release@v2
