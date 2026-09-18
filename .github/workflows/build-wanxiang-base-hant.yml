@@ -37,9 +37,14 @@ jobs:
           else
             recorded_scheme=$(python3 -c 'import json; print(json.load(open("build-info.json"))["scheme"])')
             recorded_dicts=$(python3 -c 'import json; print(json.load(open("build-info.json"))["dicts_hant"])')
+            recorded_emoji=$(python3 -c 'import json; print(json.load(open("build-info.json")).get("emoji_additions", ""))')
             latest_scheme=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git refs/heads/wanxiang-base | cut -f1)
             latest_dicts=$(git ls-remote https://github.com/amzxyz/RIME-LMDG.git refs/heads/wanxiang | cut -f1)
-            if [[ "$recorded_scheme" == "$latest_scheme" && "$recorded_dicts" == "$latest_dicts" ]]; then
+            latest_emoji=""
+            if [[ -f custom_configs/emoji新增.txt ]]; then
+              latest_emoji=$(sha256sum custom_configs/emoji新增.txt | cut -d' ' -f1)
+            fi
+            if [[ "$recorded_scheme" == "$latest_scheme" && "$recorded_dicts" == "$latest_dicts" && "$recorded_emoji" == "$latest_emoji" ]]; then
               echo "build=false" >> "$GITHUB_OUTPUT"
             else
               echo "build=true" >> "$GITHUB_OUTPUT"

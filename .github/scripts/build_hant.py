@@ -1,6 +1,7 @@
 """Build a standalone Traditional Base scheme from two upstream snapshots."""
 import argparse
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -179,8 +180,12 @@ def build(args):
     if compiled_emoji.is_file():
         subprocess.run(["opencc_dict", "-i", str(compiled_emoji), "-o", str(emoji),
                         "-f", "ocd2", "-t", "text"], check=True)
-    # Upstream may ship only text; use it directly in that case.
-    lines = convert(read(emoji), "s2t.json").splitlines()
+    # Upstream may ship only text; merge user additions before converting to Traditional.
+    emoji_source = read(emoji)
+    emoji_additions = custom / "emoji新增.txt"
+    if emoji_additions.is_file():
+        emoji_source += "\n" + read(emoji_additions)
+    lines = convert(emoji_source, "s2t.json").splitlines()
     # Different Simplified keys can become the same Traditional key.
     mapping = {}
     for line in lines:
@@ -261,7 +266,10 @@ def build(args):
 
     def revision(path):
         return subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
-    write(root / "build-info.json", json.dumps({"scheme": revision(source), "dicts_hant": revision(lmdg)}, indent=2) + "\n")
+    build_info = {"scheme": revision(source), "dicts_hant": revision(lmdg)}
+    if emoji_additions.is_file():
+        build_info["emoji_additions"] = hashlib.sha256(read(emoji_additions).encode("utf-8")).hexdigest()
+    write(root / "build-info.json", json.dumps(build_info, indent=2) + "\n")
     validate(root)
     if args.gram:
         if not args.gram.is_file() or args.gram.stat().st_size == 0:

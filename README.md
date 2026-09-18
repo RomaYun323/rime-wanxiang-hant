@@ -2,7 +2,7 @@
 
 手動建置 [rime-wanxiang / wanxiang-base](https://github.com/amzxyz/rime-wanxiang/tree/wanxiang-base)，搭配 [RIME-LMDG / dicts_hant](https://github.com/amzxyz/RIME-LMDG/tree/wanxiang/dicts_hant) 官方繁體詞庫與 `wanxiang-lts-zh-hant.gram`。
 
-在 Actions 選擇 **Build wanxiang-base-hant → Run workflow → main** 可強制完整建置與發布。每天 UTC 00:00（臺北時間 08:00）會檢查上游 `wanxiang-base` 與 RIME-LMDG 的 `wanxiang` 分支；只有任一 commit 改變時才建置、提交生成檔案並發布兩個 ZIP。Release 標籤使用 `v版本`，名稱為 `v版本 Rime万象拼音输入方案-繁體詞庫`；同版本再次發布會更新同一個 Release 及同名附件。無論上游是否更新，若 `custom_configs/wanxiang.custom.yaml` 或 `custom_configs/default.custom.yaml` 相對於 `custom-configs` 標籤有變更，流程也會更新該補丁 Release。
+在 Actions 選擇 **Build wanxiang-base-hant → Run workflow → main** 可強制完整建置與發布。每天 UTC 00:00（臺北時間 08:00）會檢查上游 `wanxiang-base`、RIME-LMDG 的 `wanxiang` 分支及 `custom_configs/emoji新增.txt`；只有任一來源改變時才建置、提交生成檔案並發布兩個 ZIP。Release 標籤使用 `v版本`，名稱為 `v版本 Rime万象拼音输入方案-繁體詞庫`；同版本再次發布會更新同一個 Release 及同名附件。無論上游是否更新，若 `custom_configs/wanxiang.custom.yaml` 或 `custom_configs/default.custom.yaml` 相對於 `custom-configs` 標籤有變更，流程也會更新該補丁 Release。
 
 - `rime-wanxiang-base.zip`：不含語言模型，需另外下載 [繁體模型](https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram)。
 - `rime-wanxiang-full.zip`：包含繁體模型。
@@ -21,4 +21,4 @@
 
 每次抓取方案上游的 `wanxiang-base` 分支及 RIME-LMDG 的 `wanxiang` 分支最新快照，`build-info.json` 記錄實際提交。建置腳本先檢查字典、附屬方案與 OpenCC 依賴；有缺漏就停止，不發布不完整套件。修改腳本後仍應以實際 Rime 重新部署、測試候選與切換行為。
 
-OpenCC 標準轉換詞典優先沿用萬象已有檔案；缺少的 `TSCharacters`、`TSPhrases`、`HKVariants`、`TWVariants` 從 [OpenCC 官方文字詞典](https://github.com/BYVoid/OpenCC/tree/master/data/dictionary) 補齊，清除註解及空行後以 `opencc_dict` 編譯為 `.ocd2`。臺灣字形客製在編譯前套用；emoji 先解碼為文字、轉繁，再編譯回 `.ocd2`。編譯後刪除中間 TXT，僅調整建置結果中的 JSON 引用，`custom_configs/` 原檔不變。缺少 `Custom_TSPhrases.txt` 時由 `Custom_STPhrases.txt` 的對照反向建立，保留 `Custom_TSPhrases.txt` 與 `Custom_Emoji.txt`；移除 `Custom_STPhrases.txt` 及 `STPhrases`、`STCharacters` 的文字檔與 `.ocd2`。
+OpenCC 標準轉換詞典優先沿用萬象已有檔案；缺少的 `TSCharacters`、`TSPhrases`、`HKVariants`、`TWVariants` 從 [OpenCC 官方文字詞典](https://github.com/BYVoid/OpenCC/tree/master/data/dictionary) 補齊，清除註解及空行後以 `opencc_dict` 編譯為 `.ocd2`。臺灣字形客製在編譯前套用；emoji 先解碼為文字，合併 `custom_configs/emoji新增.txt`，轉繁後再編譯回 `.ocd2`。編譯後刪除中間 TXT，僅調整建置結果中的 JSON 引用，`custom_configs/` 原檔不變。缺少 `Custom_TSPhrases.txt` 時由 `Custom_STPhrases.txt` 的對照反向建立，保留 `Custom_TSPhrases.txt` 與 `Custom_Emoji.txt`；移除 `Custom_STPhrases.txt` 及 `STPhrases`、`STCharacters` 的文字檔與 `.ocd2`。
