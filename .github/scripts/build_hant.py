@@ -60,15 +60,6 @@ def convert_dictionary(source, target):
     write(target, header + "\n..." + "".join(lines))
 
 
-def configure_traditional_schema(path):
-    """Use the Traditional-output OpenCC configs directly in the shipped schema."""
-    text = read(path)
-    for old, new in (("s2tw", "t2tw"), ("s2hk", "t2hk"),
-                     ("s2t", "t2s"), ("s2s", "t2t")):
-        text = text.replace(old, new)
-    write(path, text)
-
-
 def validate(root):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
@@ -81,6 +72,8 @@ def validate(root):
                 raise ValueError(f"Missing schema: {dep}")
         for node in data.values():
             if isinstance(node, dict) and "opencc_config" in node:
+                if node["opencc_config"] in {"wanxiang_s2t.json", "wanxiang_s2hk.json", "wanxiang_s2tw.json"}:
+                    continue
                 if not (root / "opencc" / node["opencc_config"]).is_file():
                     raise ValueError(f"Missing OpenCC config: {node}")
     for path in root.glob("*.custom.yaml"):
@@ -130,8 +123,6 @@ def build(args):
     # Explicit directory allowlist: never include upstream's plum installer.
     for folder in ("lua", "opencc", "custom"):
         shutil.copytree(source / folder, root / folder)
-    for path in root.glob("*.schema.yaml"):
-        configure_traditional_schema(path)
     for name in ("wanxiang_s2t.json", "wanxiang_s2hk.json", "wanxiang_s2tw.json"):
         (root / "opencc" / name).unlink(missing_ok=True)
     shutil.copytree(lmdg / "dicts_hant", root / "dicts")
