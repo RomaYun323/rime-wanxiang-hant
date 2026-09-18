@@ -37,7 +37,7 @@ jobs:
           test -s "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
           mkdir -p "$RUNNER_TEMP/opencc-source"
           # OpenCC 官方提供文字來源，缺少的標準詞典由這裡補齊後編譯。
-          for name in STCharacters STPhrases TSCharacters TSPhrases HKVariants TWVariants; do
+          for name in TSCharacters TSPhrases HKVariants TWVariants; do
             curl --fail --location --retry 5 --retry-all-errors \
               "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/${name}.txt" \
               -o "$RUNNER_TEMP/opencc-source/${name}.txt"
@@ -53,23 +53,15 @@ jobs:
             --output "$RUNNER_TEMP/hant" \
             --gram "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
 
-      - name: Apply custom OpenCC configs and package
+      - name: Validate and package compiled OpenCC configs
         run: |
           python3 - <<'PY'
           import os
           from pathlib import Path
           import runpy
-          import shutil
           import zipfile
 
           root = Path(os.environ["RUNNER_TEMP"]) / "hant"
-          custom = Path("custom_configs/opencc")
-          # 同時更新繁體補丁與上游 schema 引用的設定。
-          for original, replacement in (("s2t", "t2s"), ("s2hk", "t2hk"), ("s2tw", "t2tw")):
-              source = custom / f"wanxiang_{replacement}.json"
-              for name in (original, replacement):
-                  shutil.copy2(source, root / "opencc" / f"wanxiang_{name}.json")
-
           runpy.run_path(".github/scripts/build_hant.py")["validate"](root)
           gram = root / "wanxiang-lts-zh-hant.gram"
           if not gram.is_file() or gram.stat().st_size == 0:

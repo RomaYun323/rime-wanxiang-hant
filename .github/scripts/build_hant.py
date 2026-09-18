@@ -35,7 +35,7 @@ def yaml_header(path):
 
 def supply_opencc_dictionaries(source, target):
     """Preserve Wanxiang tables; fill missing standard dictionaries from OpenCC."""
-    for name in ("STCharacters", "STPhrases", "TSCharacters", "TSPhrases", "HKVariants", "TWVariants"):
+    for name in ("TSCharacters", "TSPhrases", "HKVariants", "TWVariants"):
         text = target / (name + ".txt")
         compiled = target / (name + ".ocd2")
         if text.is_file() or (compiled.is_file() and compiled.stat().st_size > 0):
@@ -166,8 +166,10 @@ def build(args):
                                     for key, values in reverse_phrases.items()) + "\n")
 
     # Use the maintained custom configs verbatim instead of generating JSON.
-    for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
-        shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
+    for original, replacement in (("s2t", "t2s"), ("s2hk", "t2hk"), ("s2tw", "t2tw")):
+        for name in (original, replacement):
+            shutil.copy2(custom / "opencc" / f"wanxiang_{replacement}.json",
+                         root / "opencc" / f"wanxiang_{name}.json")
 
     # Decode the upstream emoji dictionary, convert to Traditional, then compile below.
     emoji = cc / "emoji.txt"
@@ -188,8 +190,11 @@ def build(args):
             if value and value not in bucket:
                 bucket.append(value)
     write(emoji, "\n".join(k + "\t" + " ".join(v) for k, v in mapping.items()) + "\n")
+    compiled_tables = {}
     for path in cc.glob("*.txt"):
-        if path.name.startswith("Custom_"):
+        if path.stem in {"Custom_STPhrases", "STPhrases", "STCharacters"}:
+            continue
+        if path.name.startswith("Custom_") and path != ts_phrases:
             continue
         # Legacy Lua custom tables used tabs between alternatives; OpenCC uses spaces.
         normalized = []
@@ -209,6 +214,28 @@ def build(args):
         # Some versions report dictionary errors while returning exit status 0.
         if not compiled.is_file() or compiled.stat().st_size == 0:
             raise ValueError(f"OpenCC did not compile dictionary: {path}")
+        compiled_tables[path.relative_to(root / "opencc").as_posix()] = compiled.relative_to(root / "opencc").as_posix()
+
+    # Adapt output configs only; user-maintained JSON sources stay untouched.
+    def use_compiled_tables(node):
+        if isinstance(node, dict):
+            if node.get("type") == "text" and node.get("file") in compiled_tables:
+                node.update(type="ocd2", file=compiled_tables[node["file"]])
+            for value in node.values():
+                use_compiled_tables(value)
+        elif isinstance(node, list):
+            for value in node:
+                use_compiled_tables(value)
+
+    for path in (root / "opencc").glob("*.json"):
+        config = json.loads(read(path))
+        use_compiled_tables(config)
+        write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+    for filename in compiled_tables:
+        (root / "opencc" / filename).unlink()
+    for filename in ("Custom_STPhrases.txt", "Custom_STPhrases.ocd2",
+                     "STPhrases.txt", "STPhrases.ocd2", "STCharacters.txt", "STCharacters.ocd2"):
+        (cc / filename).unlink(missing_ok=True)
 
     for name in ("chinese_english", "english_chinese", "others", "tips_show", "sentence"):
         path = root / "lua/data" / (name + ".txt")
