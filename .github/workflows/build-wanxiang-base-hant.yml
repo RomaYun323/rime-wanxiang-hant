@@ -1,12 +1,7 @@
 name: Build wanxiang-base-hant
 
 on:
-  workflow_dispatch:
-    inputs:
-      publish:
-        description: '提交生成檔案並發布 Release（關閉時只測試及上傳 ZIP）'
-        type: boolean
-        default: true
+  workflow_dispatch: {}
 
 permissions:
   contents: write
