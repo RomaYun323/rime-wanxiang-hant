@@ -13,8 +13,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      configs: ${{ steps.check.outputs.configs }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: Check upstream and config changes
+        run: |
+          git fetch --force origin refs/tags/custom-configs:refs/tags/custom-configs || true
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "configs=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ ! -f build-info.json ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            recorded_scheme=$(python3 -c 'import json; print(json.load(open("build-info.json"))["scheme"])')
+            recorded_dicts=$(python3 -c 'import json; print(json.load(open("build-info.json"))["dicts_hant"])')
+            latest_scheme=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git refs/heads/wanxiang-base | cut -f1)
+            latest_dicts=$(git ls-remote https://github.com/amzxyz/RIME-LMDG.git refs/heads/wanxiang | cut -f1)
+            if [[ "$recorded_scheme" == "$latest_scheme" && "$recorded_dicts" == "$latest_dicts" ]]; then
+              echo "build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "build=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          if ! git rev-parse --verify --quiet refs/tags/custom-configs; then
+            echo "configs=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet custom-configs HEAD -- \
+            custom_configs/wanxiang.custom.yaml custom_configs/default.custom.yaml; then
+            echo "configs=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configs=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
-    if: github.ref == 'refs/heads/main'
+    needs: check-upstream
+    if: needs.check-upstream.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,39 +135,6 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Check whether config release needs updating
-        id: configs
-        run: |
-          git fetch --force origin refs/tags/custom-configs:refs/tags/custom-configs || true
-          if ! git rev-parse --verify --quiet refs/tags/custom-configs; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet custom-configs HEAD -- \
-            custom_configs/wanxiang.custom.yaml custom_configs/default.custom.yaml; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Update custom configs tag
-        if: steps.configs.outputs.publish == 'true'
-        run: |
-          git tag -f custom-configs "${{ steps.source.outputs.sha }}"
-          git push -f origin custom-configs
-
-      - name: Publish updated config files
-        if: steps.configs.outputs.publish == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: custom-configs
-          name: 萬象輸入法繁體方案補丁
-          make_latest: false
-          body: |
-            - `wanxiang.custom.yaml`：繁體方案補丁
-            - `default.custom.yaml`：全域選項保存設定
-          files: |
-            custom_configs/wanxiang.custom.yaml
-            custom_configs/default.custom.yaml
-
       - name: Publish Traditional packages
         uses: softprops/action-gh-release@v2
         with:
@@ -151,3 +161,30 @@ jobs:
           files: |
             ${{ runner.temp }}/packages/rime-wanxiang-base.zip
             ${{ runner.temp }}/packages/rime-wanxiang-full.zip
+
+  publish-configs:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.configs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update custom configs tag
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -f custom-configs "$GITHUB_SHA"
+          git push -f origin custom-configs
+
+      - name: Publish updated config files
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: custom-configs
+          name: 萬象輸入法繁體方案補丁
+          make_latest: false
+          body: |
+            - `wanxiang.custom.yaml`：繁體方案補丁
+            - `default.custom.yaml`：全域選項保存設定
+          files: |
+            custom_configs/wanxiang.custom.yaml
+            custom_configs/default.custom.yaml
