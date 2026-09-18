@@ -1,11 +1,30 @@
 {
-  "name": "wanxiang_t2s",
+  "name": "Traditional Chinese to Simplified Chinese",
+  "segmentation": {
+    "type": "mmseg",
+    "dict": {
+      "type": "group",
+      "dicts": [
+        {
+          "type": "text",
+          "file": "wanxiang/Custom_TSPhrases.txt"
+        },
+        {
+          "type": "ocd2",
+          "file": "wanxiang/TSPhrases.ocd2"
+        }
+      ]
+    }
+  },
   "conversion_chain": [
     {
       "dict": {
         "type": "group",
-        "match_policy": "short_circuit",
         "dicts": [
+          {
+            "type": "text",
+            "file": "wanxiang/Custom_TSPhrases.txt"
+          },
           {
             "type": "ocd2",
             "file": "wanxiang/TSPhrases.ocd2"
@@ -17,22 +36,5 @@
         ]
       }
     }
-  ],
-  "segmentation": {
-    "type": "mmseg",
-    "dict": {
-      "type": "group",
-      "match_policy": "short_circuit",
-      "dicts": [
-        {
-          "type": "ocd2",
-          "file": "wanxiang/TSPhrases.ocd2"
-        },
-        {
-          "type": "ocd2",
-          "file": "wanxiang/TSCharacters.ocd2"
-        }
-      ]
-    }
-  }
+  ]
 }

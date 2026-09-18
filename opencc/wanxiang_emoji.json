@@ -1,6 +1,5 @@
 {
   "name": "Emoji",
-
   "segmentation": {
     "type": "mmseg",
     "dict": {
@@ -17,7 +16,6 @@
       ]
     }
   },
-
   "conversion_chain": [
     {
       "dict": {
