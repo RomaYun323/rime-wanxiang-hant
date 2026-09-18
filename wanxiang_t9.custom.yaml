@@ -1,10 +1,5 @@
 # Generated Traditional overrides; upstream schema is unchanged.
 patch:
-  speller/algebra:
-    __patch:
-    - wanxiang_algebra:/base/全拼
-    - wanxiang_algebra:/26jian
-  menu/page_size: 6
   grammar/language: wanxiang-lts-zh-hant
   t2s:
     option_name: t2s
@@ -45,6 +40,11 @@ patch:
     states:
     - 翻译关
     - 翻译开
+  - name: charset_filter
+    states:
+    - 大字集
+    - 小字集
+    reset: 0
   - name: context_reorder
     states:
     - 上下文关
@@ -57,6 +57,7 @@ patch:
     - 原编码
     - 有声调
     - 无声调
+    reset: 2
   - options:
     - t2t
     - t2s
@@ -68,11 +69,6 @@ patch:
     - 港繁
     - 臺繁
     reset: 3
-  - name: abbrev
-    states:
-    - 简码关
-    - 简码开
-    reset: 1
   - options:
     - comment_off
     - tone_hint
@@ -81,29 +77,21 @@ patch:
     - 注释关
     - 有声调
     - 无声调
+    reset: 0
   - name: super_tips
     states:
     - 提示关
     - 提示开
-  - name: charset_filter
-    states:
-    - 大字集
-    - 小字集
-  - name: char_priority
-    states:
-    - 词组先
-    - 单字先
-  - name: english
     reset: 1
+  - name: abbrev
     states:
-    - 英文关
-    - 英文开
+    - 简码关
+    - 简码开
+    reset: 1
   engine/filters:
-  - lua_filter@*wanxiang.charset_filter
   - lua_filter@*wanxiang.super_lookup
   - lua_filter@*wanxiang.custom_phrase
   - lua_filter@*wanxiang.context_reorder*F
-  - lua_filter@*wanxiang.charset_filter
   - lua_filter@*wanxiang.super_comment_preedit
   - simplifier@t2s
   - simplifier@t2hk
@@ -111,8 +99,6 @@ patch:
   - simplifier@emoji
   - lua_filter@*wanxiang.super_replacer
   - lua_filter@*wanxiang.super_filter
-  - lua_filter@*wanxiang.super_english*F
-  - lua_filter@*wanxiang.super_sequence*F
   - uniquifier
   charset_filter:
   - option: charset_filter
@@ -134,64 +120,14 @@ patch:
     blacklist: []
   key_binder/bindings:
   - when: has_menu
-    accept: minus
-    send: Page_Up
-  - when: has_menu
-    accept: equal
-    send: Page_Down
-  - when: always
-    toggle: ascii_punct
-    accept: Control+Shift+3
-  - when: always
-    toggle: ascii_punct
-    accept: Control+Shift+numbersign
-  - when: always
-    toggle: t2s
-    accept: Control+Shift+4
-  - when: always
-    toggle: t2s
-    accept: Control+Shift+dollar
-  - when: composing
-    accept: Alt+Left
-    send: Shift+Left
-  - when: composing
-    accept: Alt+Right
-    send: Shift+Right
-  - when: composing
-    accept: Control+w
-    send: Control+BackSpace
-  - when: has_menu
-    accept: Control+e
-    toggle: chinese_english
-  - when: has_menu
-    accept: Control+a
-    toggle: tone_hint
-  - when: has_menu
-    accept: Control+s
-    toggle: tone_display
-  - when: has_menu
-    accept: Control+t
-    toggle: super_tips
-  - when: has_menu
-    accept: Control+g
-    toggle: charset_filter
-  - when: composing
-    accept: Control+g
-    toggle: charset_filter
-  - when: always
-    accept: Shift+space
-    select: .next
-  - when: has_menu
-    accept: Tab
-    send: Control+Right
-  - when: composing
-    accept: Tab
-    send: Control+Right
+    accept: 1
+    send: apostrophe
   - when: composing
     accept: Control+Tab
     send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
-  - match: ^/$
-    accept: /
-    send_sequence: '{space}'
-  - accept: Shift+Return
-    send_sequence: '{option:tone_display=true}{Shift+Return}{option:tone_display=false}'
+  - match: ^.*`$
+    accept: '`'
+    send_sequence: '{BackSpace}{Home}{`}{`}{End}'
+  - when: composing
+    accept: Return
+    send: Shift+Return
