@@ -1,0 +1,38 @@
+{
+  "name": "wanxiang_t2s",
+  "conversion_chain": [
+    {
+      "dict": {
+        "type": "group",
+        "match_policy": "short_circuit",
+        "dicts": [
+          {
+            "type": "ocd2",
+            "file": "wanxiang/TSPhrases.ocd2"
+          },
+          {
+            "type": "ocd2",
+            "file": "wanxiang/TSCharacters.ocd2"
+          }
+        ]
+      }
+    }
+  ],
+  "segmentation": {
+    "type": "mmseg",
+    "dict": {
+      "type": "group",
+      "match_policy": "short_circuit",
+      "dicts": [
+        {
+          "type": "ocd2",
+          "file": "wanxiang/TSPhrases.ocd2"
+        },
+        {
+          "type": "ocd2",
+          "file": "wanxiang/TSCharacters.ocd2"
+        }
+      ]
+    }
+  }
+}

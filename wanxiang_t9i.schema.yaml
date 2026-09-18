@@ -1,0 +1,408 @@
+# Generated Traditional scheme; edit .github/scripts/build_hant.py
+schema:
+  schema_id: wanxiang_t9i
+  name: 万象九键(元书)
+  version: LTS
+  author:
+  - amzxyz
+  description: '万象拼音九宫格方案，适用于iOS元书、仓输入法的技术路线
+
+    '
+  dependencies:
+  - wanxiang_abbrev_t9
+  - wanxiang_phrase_t9
+switches:
+- name: ascii_mode
+  states:
+  - 中文
+  - 英文
+- name: ascii_punct
+  states:
+  - 中标
+  - 英标
+- name: full_shape
+  states:
+  - 半角
+  - 全角
+- name: emoji
+  states:
+  - 表情关
+  - 表情开
+- name: chinese_english
+  states:
+  - 翻译关
+  - 翻译开
+- name: charset_filter
+  states:
+  - 大字集
+  - 小字集
+  reset: 0
+- name: context_reorder
+  states:
+  - 上下文关
+  - 上下文开
+- options:
+  - raw_input
+  - tone_display
+  - full_pinyin
+  states:
+  - 原编码
+  - 有声调
+  - 无声调
+  reset: 2
+- options:
+  - t2t
+  - t2s
+  - t2hk
+  - t2tw
+  states:
+  - 通繁
+  - 簡體
+  - 港繁
+  - 臺繁
+  reset: 3
+- options:
+  - comment_off
+  - tone_hint
+  - toneless_hint
+  states:
+  - 注释关
+  - 有声调
+  - 无声调
+  reset: 2
+- name: super_tips
+  states:
+  - 提示关
+  - 提示开
+  reset: 1
+- name: abbrev
+  states:
+  - 简码关
+  - 简码开
+  reset: 1
+engine:
+  processors:
+  - lua_processor@*wanxiang.context_reorder*P
+  - lua_processor@*wanxiang.super_processor
+  - t9_processor
+  - lua_processor@*wanxiang.super_tips
+  - ascii_composer
+  - recognizer
+  - key_binder
+  - lua_processor@*wanxiang.key_binder
+  - speller
+  - punctuator
+  - selector
+  - navigator
+  - express_editor
+  segmentors:
+  - ascii_segmentor
+  - matcher
+  - abc_segmentor
+  - affix_segmentor@wanxiang_reverse
+  - punct_segmentor
+  - fallback_segmentor
+  translators:
+  - punct_translator
+  - script_translator
+  - lua_translator@*wanxiang.version_display
+  - lua_translator@*wanxiang.shijian
+  - lua_translator@*wanxiang.super_calculator
+  - lua_translator@*wanxiang.input_statistics
+  - lua_translator@*wanxiang.number_conversion
+  - reverse_lookup_translator@wanxiang_reverse
+  filters:
+  - lua_filter@*wanxiang.super_lookup
+  - lua_filter@*wanxiang.custom_phrase
+  - lua_filter@*wanxiang.context_reorder*F
+  - lua_filter@*wanxiang.super_comment_preedit
+  - simplifier@t2s
+  - simplifier@t2hk
+  - simplifier@t2sw
+  - simplifier@emoji
+  - lua_filter@*wanxiang.super_replacer
+  - lua_filter@*wanxiang.super_filter
+  - uniquifier
+grammar:
+  language: wanxiang-lts-zh-hant
+  collocation_max_length: 6
+  collocation_min_length: 2
+  collocation_penalty: -14
+  non_collocation_penalty: -6
+  weak_collocation_penalty: -100
+  rear_penalty: -18
+translator:
+  dictionary: wanxiang_lite
+  prism: wanxiang_t9
+  enable_completion: true
+  enable_user_dict: true
+  enable_sentence: false
+  enable_correction: false
+  encode_commit_history: true
+  contextual_suggestions: false
+  max_homophones: 8
+  core_word_length: 4
+  max_word_length: 7
+  initial_quality: 3
+  spelling_hints: 50
+  always_show_comments: true
+  comment_format:
+  - xform/;[a-z]{2}(,[a-z]{2})*//
+custom_phrase:
+  dictionary: custom_phrase
+  prism: wanxiang_phrase_t9
+  enable_user_dict: false
+  enable_completion: false
+  always_show_comments: true
+  spelling_hints: 50
+abbrev_phrase:
+  dictionary: wanxiang_abbrev_t9
+  prism: wanxiang_abbrev_t9
+  enable_user_dict: false
+  enable_completion: false
+  always_show_comments: true
+  spelling_hints: 50
+  insert_position: 3
+  max_candidates: 3
+wanxiang_lookup:
+  tags:
+  - abc
+  key: '`'
+  lookup:
+  - wanxiang_reverse
+  data_source:
+  - db
+emoji:
+  option_name: emoji
+  opencc_config: wanxiang_emoji.json
+  tips: none
+  inherit_comment: false
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210`/\
+  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA9876543210/
+  delimiter: ' '''
+  algebra:
+  - xform/ⅱ//
+  - xform/^(.*);.*$/$1/
+  - xlit/āáǎàōóǒòēéěèīíǐìūúǔùǖǘǚǜüńňǹ/aaaaooooeeeeiiiiuuuuvvvvvnnn/
+  - xform/ḿ/me/
+  - xform/m̀/me/
+  - derive/^ng$/eng/
+  - xform/^n$/en/
+  - derive/^(.*)$/\U$1/
+  - derive/^([nl])ve$/$1ue/
+  - derive/^([NL])VE$/$1UE/
+  - derive/ong$/on/
+  - derive/iong$/ion/
+  - derive/ONG$/ON/
+  - derive/IONG$/ION/
+  - derive/^([jqxy])u/$1v/
+  - derive/^([JQXY])U/$1V/
+  - xlit/ABCDEFGHIJKLMNOPQRSTUVWXYZ/22233344455566677778889999/
+recognizer:
+  import_preset: default
+  patterns:
+    punct: ^/(?!/)(?:[A-Za-z]+|[!-/:-@\[-`{-~][!-/:-~]?[A-Za-z]?|[A-Za-z][!-\+/:-<>-@\\\^-`{-~][A-Za-z]?|[ADEIKLOTUadeilotu]-[A-Za-z]?|[CEHLNPRTWYc-ehpry]=[A-Za-z]?|[AC-EG-IKLNOR-Ua-eg-iklnor-u],[A-Za-z]?|[B-GIMPS-UZb-gimpstz]\.[A-Za-z]?|\([)A-Za-z]\)|--[-.]|\\o/|[0-9]|0[3*~]|1(?:[0-9^]|10)|2[35^]|3[458^]|45|5[68]|78|88|\*0|<3|\^[0-9]|_[0-9]|~0|\((?:[0-9]|[1-4][0-9]|50)\)?)$
+    wanxiang_reverse: ^`[A-Za-z7890;]*$
+    unicode: ^U[a-f0-9]+
+    number: ^R(-|-?[0-9]+[.:]?[0-9]*)$
+    yr1: ^N0[1-9]?0?[1-9]?
+    yr2: ^N1[02]?0?[1-9]?
+    yr3: ^N0[1-9]?[1-2]?[1-9]?
+    yr4: ^N1[02]?[1-2]?[1-9]?
+    yr5: ^N0[1-9]?3?[01]?
+    yr6: ^N1[02]?3?[01]?
+    nyr1: ^N19?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?
+    nyr2: ^N20?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?
+    nyr_diff: ^N(19|20)[0-9]{6}-[0-9]{0,8}$
+    calculator: ^V.*$
+    email: ^[A-Za-z][-_.0-9A-Za-z]*@.*$
+    url: ^(www[.]|https?:|ftp[.:]|mailto:|file:).*$|^[a-z]+[.].+$
+punctuator:
+  digit_separators: ',.'
+  __include: wanxiang_symbols:/symbol_table
+  __patch:
+  - wanxiang_symbols:/symbols
+  - t9_sym
+t9_sym:
+  half_shape/+:
+    '1':
+    - 1
+    - '@'
+    - .
+    - /
+    - ':'
+    - _
+    - '-'
+    - '#'
+    '@':
+    - 1
+    - '@'
+    - ！
+    - ：
+    - 、
+    - ……
+    - ～
+    '#':
+    - 0
+    - '#'
+    - $
+    - '%'
+    - ^
+    - '&'
+    - '*'
+    - (
+    - )
+key_binder:
+  import_preset: default
+  shijian_keys:
+  - /
+  - '6'
+  bindings:
+  - when: has_menu
+    accept: 1
+    send: apostrophe
+  - when: composing
+    accept: Control+Tab
+    send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
+  - match: ^.*`$
+    accept: '`'
+    send_sequence: '{BackSpace}{Home}{`}{`}{End}'
+  - when: composing
+    accept: Return
+    send: Shift+Return
+super_comment:
+  candidate_length: 15
+  corrector_type: comment
+  tone_isolate: true
+  convert_abbrev_preedit: false
+  cand_type: null
+super_processor:
+  enable_backspace_limit: false
+  enable_seg_loop: false
+  enable_tone_fallback: false
+  enable_predict_space: true
+  kp_number_mode: auto
+  limit_repeated: 8,40
+  select_character: '[,]'
+context_reorder:
+  db_name: context_reorder
+  enable_fallback_reorder: false
+  context_timeout: 5000
+  custom_classifiers:
+  - 个只名位口人头匹条群批伙多
+  - 张把件台部块根颗粒滴片朵面扇顶栋座所辆艘架盏支枝杆
+  - 双对副套打串束排阵堆叠摞扎
+  - 杯瓶盒包份碗锅盆桶袋罐盘
+  - 次场局回趟顿番遍声项宗桩款步招
+  - 年月天周岁秒分刻代期届任夜季
+  - 本册篇首句段卷幅节堂门帖字行
+  - 米寸尺里斤两吨克升元角毛笔百千万亿
+charset_filter:
+- option: charset_filter
+  base: fth
+  addlist:
+  - 诶濛硷氽尛躝〇冇吔磺咗囧屌鲶芶咲畑垅𰻝𰻞龍朙頔雲
+  blacklist: []
+- option: t2s
+  base: fth
+  addlist: []
+  blacklist: []
+- option: t2hk
+  base: fth
+  addlist: []
+  blacklist: []
+- option: t2tw
+  base: fth
+  addlist: []
+  blacklist: []
+super_tips:
+  tips_key: comma
+  files:
+  - lua/data/tips_show.txt
+  disabled_types:
+  - 禁用类型A
+  - 禁用类型B
+date_formats:
+- Y年m月d日
+- Y-m-d
+- Y/m/d
+- Y.m.d
+- Ymd
+- Y年n月j日
+- y年n月j日
+- n月j日
+time_formats:
+- H:M
+- H点M分
+- H:M:S
+- H时M分S秒
+- AI:M
+- I:M P
+datetime_formats:
+- Y-m-d H:M:S
+- Y-m-dTH:M:S O
+- YmdHMS
+- Y年m月d日 H点M分
+- y/m/d I:M p
+english_date_formats:
+- B j, Y
+- j b Y
+- Y-m-d
+input_stats:
+  db_name: stats
+  triggers:
+    local_total: /btj
+    today: /rtj
+    week: /ztj
+    month: /ytj
+    year: /ntj
+    total: /tj
+    history: /htj
+super_replacer:
+  comment_format: 〔%s〕
+  chain: true
+  rules:
+  - option: chinese_english
+    mode: append
+    comment_mode: none
+    tags:
+    - abc
+    prefix: _en_
+    files:
+    - lua/data/english_chinese.txt
+    - lua/data/chinese_english.txt
+  - option: true
+    mode: append
+    comment_mode: none
+    tags:
+    - abc
+    prefix: _ot_
+    files:
+    - lua/data/others.txt
+  - option: true
+    mode: append
+    sentence: true
+    tags:
+    - abc
+    prefix: _ling_
+    files:
+    - lua/data/sentence.txt
+t2s:
+  option_name: t2s
+  opencc_config: wanxiang_t2s.json
+  tips: none
+  tags:
+  - abc
+t2hk:
+  option_name: t2hk
+  opencc_config: wanxiang_t2hk.json
+  tips: none
+  tags:
+  - abc
+t2tw:
+  option_name: t2tw
+  opencc_config: wanxiang_t2tw.json
+  tips: none
+  tags:
+  - abc

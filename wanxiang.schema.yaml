@@ -1,0 +1,668 @@
+# Generated Traditional scheme; edit .github/scripts/build_hant.py
+schema:
+  schema_id: wanxiang
+  name: 万象拼音
+  version: LTS
+  author:
+  - amzxyz
+  description: '请勾选【万象拼音】以启用，万象拼音标准版本，带声调的词库，支持语法模型，全拼、简拼、整句、声调辅助筛选，拥有超越大厂的输入体验！
+
+    请在文本框中直接输入对应方案的代码，例如：全拼输入“/pinyin”，自然码输入“/zrm”，小鹤输入“/flypy”（包含“/mspy”、“/sogou”、“/pyjj”等更多代码详见 README.md）。
+
+    '
+  dependencies:
+  - wanxiang_mixedcode
+  - wanxiang_reverse
+  - wanxiang_english
+  - wanxiang_abbrev
+  - wanxiang_phrase
+switches:
+- name: ascii_mode
+  states:
+  - 中文
+  - 英文
+- name: ascii_punct
+  states:
+  - 中标
+  - 英标
+- name: full_shape
+  states:
+  - 半角
+  - 全角
+- name: emoji
+  states:
+  - 表情关
+  - 表情开
+- name: chinese_english
+  states:
+  - 翻译关
+  - 翻译开
+- name: context_reorder
+  states:
+  - 上下文关
+  - 上下文开
+- options:
+  - raw_input
+  - tone_display
+  - full_pinyin
+  states:
+  - 原编码
+  - 有声调
+  - 无声调
+- options:
+  - t2t
+  - t2s
+  - t2hk
+  - t2tw
+  states:
+  - 通繁
+  - 簡體
+  - 港繁
+  - 臺繁
+  reset: 3
+- name: abbrev
+  states:
+  - 简码关
+  - 简码开
+  reset: 1
+- options:
+  - comment_off
+  - tone_hint
+  - toneless_hint
+  states:
+  - 注释关
+  - 有声调
+  - 无声调
+- name: super_tips
+  states:
+  - 提示关
+  - 提示开
+- name: charset_filter
+  states:
+  - 大字集
+  - 小字集
+- name: char_priority
+  states:
+  - 词组先
+  - 单字先
+- name: english
+  reset: 1
+  states:
+  - 英文关
+  - 英文开
+engine:
+  processors:
+  - lua_processor@*wanxiang.super_processor
+  - lua_processor@*wanxiang.unicode_conversion*P
+  - lua_processor@*wanxiang.context_reorder*P
+  - lua_processor@*wanxiang.super_english*P
+  - lua_processor@*wanxiang.partial_commit
+  - lua_processor@*wanxiang.super_sequence*P
+  - lua_processor@*wanxiang.super_tips
+  - ascii_composer
+  - recognizer
+  - key_binder
+  - lua_processor@*wanxiang.key_binder
+  - speller
+  - punctuator
+  - selector
+  - navigator
+  - express_editor
+  segmentors:
+  - ascii_segmentor
+  - matcher
+  - abc_segmentor
+  - affix_segmentor@wanxiang_reverse
+  - affix_segmentor@add_user_dict
+  - punct_segmentor
+  - fallback_segmentor
+  translators:
+  - punct_translator
+  - script_translator
+  - lua_translator@*wanxiang.version_display
+  - lua_translator@*wanxiang.set_schema
+  - lua_translator@*wanxiang.shijian
+  - lua_translator@*wanxiang.unicode_conversion*T
+  - lua_translator@*wanxiang.number_conversion
+  - lua_translator@*wanxiang.super_calculator
+  - lua_translator@*wanxiang.random_tools
+  - lua_translator@*wanxiang.input_statistics
+  - lua_translator@*wanxiang.super_symbols
+  - lua_translator@*wanxiang.super_english*T
+  - table_translator@wanxiang_mixedcode
+  - reverse_lookup_translator@wanxiang_reverse
+  - script_translator@add_user_dict
+  - script_translator@user_dict_set
+  filters:
+  - lua_filter@*wanxiang.charset_filter
+  - lua_filter@*wanxiang.super_lookup
+  - lua_filter@*wanxiang.custom_phrase
+  - lua_filter@*wanxiang.context_reorder*F
+  - lua_filter@*wanxiang.charset_filter
+  - lua_filter@*wanxiang.super_comment_preedit
+  - simplifier@t2s
+  - simplifier@t2hk
+  - simplifier@t2sw
+  - simplifier@emoji
+  - lua_filter@*wanxiang.super_replacer
+  - lua_filter@*wanxiang.super_filter
+  - lua_filter@*wanxiang.super_english*F
+  - lua_filter@*wanxiang.super_sequence*F
+  - uniquifier
+grammar:
+  language: wanxiang-lts-zh-hant
+  collocation_max_length: 6
+  collocation_min_length: 2
+  collocation_penalty: -14
+  non_collocation_penalty: -6
+  weak_collocation_penalty: -100
+  rear_penalty: -18
+translator:
+  dictionary: wanxiang
+  enable_completion: true
+  enable_user_dict: true
+  core_word_length: 4
+  max_word_length: 7
+  contextual_suggestions: false
+  max_homophones: 8
+  initial_quality: 3
+  spelling_hints: 30
+  always_show_comments: true
+  comment_format: null
+user_dict_set:
+  dictionary: wanxiang
+  initial_quality: 0
+  enable_completion: false
+  enable_sentence: false
+  spelling_hints: 50
+  contextual_suggestions: false
+  max_homophones: 8
+  comment_format: null
+  enable_user_dict: false
+  user_dict: zc
+add_user_dict:
+  tag: add_user_dict
+  dictionary: wanxiang
+  initial_quality: -1
+  user_dict: zc
+  enable_completion: true
+  enable_user_dict: false
+  enable_auto_phrase: true
+  spelling_hints: 50
+  comment_format: null
+  prefix: '``'
+  tips: 〔开始造词〕
+custom_phrase:
+  dictionary: custom_phrase
+  prism: wanxiang_phrase
+  enable_user_dict: false
+  enable_completion: false
+  always_show_comments: true
+  spelling_hints: 50
+abbrev_phrase:
+  dictionary: wanxiang_abbrev
+  prism: wanxiang_abbrev
+  enable_user_dict: false
+  enable_completion: false
+  always_show_comments: true
+  spelling_hints: 50
+  insert_position: 6
+  max_candidates: 1
+wanxiang_english:
+  dictionary: wanxiang_english
+  user_dict: en
+  enable_completion: true
+  enable_sentence: false
+  initial_quality: 2.1
+  comment_format:
+  - xform/^~.+$//
+  english_spacing: smart
+  spacing_timeout: 5
+  max_candidates: 5
+  trigger: \
+wanxiang_mixedcode:
+  dictionary: wanxiang_mixedcode
+  db_class: stabledb
+  enable_completion: true
+  enable_sentence: false
+  initial_quality: 2
+  comment_format:
+  - xform/.*//
+wanxiang_reverse:
+  tag: wanxiang_reverse
+  dictionary: wanxiang_reverse
+  enable_completion: true
+  prefix: '`'
+  tips: 〔反查：拆分|笔画〕
+wanxiang_lookup:
+  tags:
+  - abc
+  - add_user_dict
+  key: '`'
+  lookup:
+  - wanxiang_reverse
+  data_source:
+  - db
+  enable_tone: true
+  enable_direct: false
+emoji:
+  option_name: emoji
+  opencc_config: wanxiang_emoji.json
+  tips: none
+  inherit_comment: false
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA1234567890`;/\
+  initials: zyxwvutsrqponmlkjihgfedcbaZYXWVUTSRQPONMLKJIHGFEDCBA/
+  delimiter: ' '''
+  algebra:
+    __patch:
+    - wanxiang_algebra:/base/全拼
+recognizer:
+  import_preset: default
+  patterns:
+    punct: ^/(?!/)(?:[A-Za-z]+|[!-/:-@\[-`{-~][!-/:-~]?[A-Za-z]?|[A-Za-z][!-\+/:-<>-@\\\^-`{-~][A-Za-z]?|[ADEIKLOTUadeilotu]-[A-Za-z]?|[CEHLNPRTWYc-ehpry]=[A-Za-z]?|[AC-EG-IKLNOR-Ua-eg-iklnor-u],[A-Za-z]?|[B-GIMPS-UZb-gimpstz]\.[A-Za-z]?|\([)A-Za-z]\)|--[-.]|\\o/|[0-9]|0[3*~]|1(?:[0-9^]|10)|2[35^]|3[458^]|45|5[68]|78|88|\*0|<3|\^[0-9]|_[0-9]|~0|\((?:[0-9]|[1-4][0-9]|50)\)?)$
+    super_sym: ^/sym[.?/][A-Za-z.]+$
+    super_emoji: ^/emoji[.?/][A-Za-z.]+$
+    super_sym_pre: ^/sym[.?/]?$
+    super_emoji_pre: ^/emoji[.?/]?$
+    wanxiang_reverse: ^`[A-Za-z7890;]*$
+    unicode: ^U([0-9A-Fa-f]*|[xXhH][0-9A-Fa-f]*|[dD][0-9]*|[bB][01]*|[oO][0-7]*|0[xX][0-9A-Fa-f]*|0[dD][0-9]*|0[bB][01]*|0[oO][0-7]*|\+[0-9A-Fa-f]*|c.*)$
+    number: ^R(-|-?[0-9]+[.:]?[0-9]*)$
+    sjc: ^[/o]rc\d+[-+=op]?$
+    yr1: ^N0[1-9]?0?[1-9]?
+    yr2: ^N1[02]?0?[1-9]?
+    yr3: ^N0[1-9]?[1-2]?[1-9]?
+    yr4: ^N1[02]?[1-2]?[1-9]?
+    yr5: ^N0[1-9]?3?[01]?
+    yr6: ^N1[02]?3?[01]?
+    nyr1: ^N19?[0-9]?[0-9]?[0-1]?[0-9]?[0-9]?[0-9]?
+    nyr2: ^N20?[0-9]?[0-9]?[0-1]?[0-9]?[0-9]?[0-9]?
+    nyr_diff: ^N(19|20)[0-9]{6}-[0-9]{0,8}$
+    calculator: ^V.*$
+    email: ^[A-Za-z][-_.0-9A-Za-z]*@.*$
+    url: ^(www[.]|https?:|ftp[.:]|mailto:|file:).*$
+    htj: ^/htj.*$
+punctuator:
+  digit_separators: ',.:'
+  __include: wanxiang_symbols:/symbol_table
+  __patch: wanxiang_symbols:/symbols
+key_binder:
+  import_preset: default
+  shijian_keys:
+  - /
+  - o
+  bindings:
+  - when: has_menu
+    accept: minus
+    send: Page_Up
+  - when: has_menu
+    accept: equal
+    send: Page_Down
+  - when: always
+    toggle: ascii_punct
+    accept: Control+Shift+3
+  - when: always
+    toggle: ascii_punct
+    accept: Control+Shift+numbersign
+  - when: always
+    toggle: t2s
+    accept: Control+Shift+4
+  - when: always
+    toggle: t2s
+    accept: Control+Shift+dollar
+  - when: composing
+    accept: Alt+Left
+    send: Shift+Left
+  - when: composing
+    accept: Alt+Right
+    send: Shift+Right
+  - when: composing
+    accept: Control+w
+    send: Control+BackSpace
+  - when: has_menu
+    accept: Control+e
+    toggle: chinese_english
+  - when: has_menu
+    accept: Control+a
+    toggle: tone_hint
+  - when: has_menu
+    accept: Control+s
+    toggle: tone_display
+  - when: has_menu
+    accept: Control+t
+    toggle: super_tips
+  - when: has_menu
+    accept: Control+g
+    toggle: charset_filter
+  - when: composing
+    accept: Control+g
+    toggle: charset_filter
+  - when: always
+    accept: Shift+space
+    select: .next
+  - when: has_menu
+    accept: Tab
+    send: Control+Right
+  - when: composing
+    accept: Tab
+    send: Control+Right
+  - when: composing
+    accept: Control+Tab
+    send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
+  - match: ^/$
+    accept: /
+    send_sequence: '{space}'
+  - accept: Shift+Return
+    send_sequence: '{option:tone_display=true}{Shift+Return}{option:tone_display=false}'
+editor:
+  bindings:
+    space: confirm
+    Return: commit_raw_input
+    Control+Return: commit_script_text
+    Control+Shift+Return: commit_comment
+    BackSpace: revert
+    Delete: delete
+    Control+BackSpace: back_syllable
+    Control+Delete: delete_candidate
+    Escape: cancel
+navigator:
+  bindings:
+    Left: left_by_char_no_loop
+    Right: right_by_char_no_loop
+    Shift+Left: left_by_syllable
+    Shift+Right: right_by_syllable
+super_comment:
+  candidate_length: 2
+  corrector_type: 〔comment〕
+  tone_isolate: true
+  convert_abbrev_preedit: false
+  cand_type:
+    user_phrase: ''
+    sentence: ''
+    phrase: ''
+    table: ''
+    user_table: ''
+    completion: ''
+    predict: ''
+    abbrev: ''
+    fallback: '~'
+super_processor:
+  enable_backspace_limit: true
+  enable_seg_loop: true
+  enable_tone_fallback: true
+  enable_predict_space: false
+  kp_number_mode: auto
+  limit_repeated: 8,40
+  select_character: '[,]'
+unicode:
+  key: Control+u
+context_reorder:
+  db_name: context_reorder
+  enable_fallback_reorder: false
+  context_timeout: 5000
+  custom_classifiers:
+  - 个只名位口人头匹条群批伙多
+  - 张把件台部块根颗粒滴片朵面扇顶栋座所辆艘架盏支枝杆
+  - 双对副套打串束排阵堆叠摞扎
+  - 杯瓶盒包份碗锅盆桶袋罐盘
+  - 次场局回趟顿番遍声项宗桩款步招
+  - 年月天周岁秒分刻代期届任夜季
+  - 本册篇首句段卷幅节堂门帖字行
+  - 米寸尺里斤两吨克升元角毛笔百千万亿
+super_tips:
+  tips_key: comma
+  files:
+  - lua/data/tips_show.txt
+  disabled_types:
+  - 禁用类型A
+  - 禁用类型B
+super_sequence:
+  db_name: sequence
+  up: Control+j
+  down: Control+k
+  reset: Control+l
+  pin: Control+p
+random_tools:
+  uuid: /uuid
+  uuid7: /uuidq
+  ulid: /ulid
+  password: /mima
+  password_special: /mimas
+  password_lengths: 6,8,10,16
+  chars:
+    upper: ABCDEFGHJKLMNPQRSTUVWXYZ
+    lower: abcdefghijkmnopqrstuvwxyz
+    digit: '23456789'
+    special: '!@#$%^&*_-+'
+super_symbols:
+  prefix_sym: /sym
+  prefix_emoji: /emoji
+  max_candidates: 30
+  data_sym: lua/data/codex_sym.txt
+  data_emoji: lua/data/codex_emoji.txt
+super_replacer:
+  comment_format: 〔%s〕
+  chain: true
+  rules:
+  - option: chinese_english
+    mode: append
+    comment_mode: none
+    tags:
+    - abc
+    prefix: _en_
+    files:
+    - lua/data/english_chinese.txt
+    - lua/data/chinese_english.txt
+  - option: true
+    mode: append
+    comment_mode: none
+    tags:
+    - abc
+    prefix: _ot_
+    files:
+    - lua/data/others.txt
+  - option: true
+    mode: append
+    sentence: true
+    tags:
+    - abc
+    prefix: _ling_
+    files:
+    - lua/data/sentence.txt
+charset_filter:
+- option: charset_filter
+  base: fth
+  addlist:
+  - 诶濛硷氽尛躝〇冇吔磺咗囧屌鲶芶咲畑垅𰻝𰻞龍朙頔雲
+  blacklist: []
+- option: t2s
+  base: fth
+  addlist: []
+  blacklist: []
+- option: t2hk
+  base: fth
+  addlist: []
+  blacklist: []
+- option: t2tw
+  base: fth
+  addlist: []
+  blacklist: []
+date_formats:
+- Y年m月d日
+- Y-m-d
+- Y/m/d
+- Y.m.d
+- Ymd
+- Y年n月j日
+- y年n月j日
+- n月j日
+time_formats:
+- H:M
+- H点M分
+- H:M:S
+- H时M分S秒
+- AI:M
+- I:M P
+datetime_formats:
+- Y-m-d H:M:S
+- Y-m-dTH:M:S O
+- YmdHMS
+- Y年m月d日 H点M分
+- y/m/d I:M p
+english_date_formats:
+- B j, Y
+- j b Y
+- Y-m-d
+tone_preedit:
+  '7': ¹
+  '8': ²
+  '9': ³
+  '0': ⁴
+input_stats:
+  db_name: stats
+  triggers:
+    local_total: /btj
+    today: /rtj
+    week: /ztj
+    month: /ytj
+    year: /ntj
+    total: /tj
+    history: /htj
+quick_symbol_text:
+  trigger: ^([a-z])/$
+  symkey:
+    q: repeat
+    w: ？
+    e: （
+    r: ）
+    t: "\t"
+    y: ·
+    u: 『
+    i: 』
+    o: 〖
+    p: 〗
+    a: ！
+    s: ……
+    d: 、
+    f: “
+    g: ”
+    h: ‘
+    j: ’
+    k: 【
+    l: 】
+    z: 。”
+    x: ？”
+    c: ！”
+    v: ——
+    b: '%'
+    n: 《
+    m: 》
+paired_symbols:
+  trigger: \
+  symkey:
+    a: '[]'
+    b: 【】
+    c: ❲❳
+    d: 〔〕
+    e: ⟮⟯
+    f: ⟦⟧
+    g: 「」
+    i: 『』
+    j: <>
+    k: 《》
+    l: 〈〉
+    m: ‹›
+    n: «»
+    o: ⦅⦆
+    p: ⦇⦈
+    q: ()
+    r: 〖〗
+    s: ［］
+    t: ⟨⟩
+    u: 〈〉
+    v: ❰❱
+    w: （）
+    x: ｛｝
+    y: ⟪⟫
+    z: '{}'
+    dy: ''''''
+    sy: '""'
+    zs: “”
+    zd: ‘’
+    fy: '``'
+    aa: 〚〛
+    bb: 〘〙
+    cc: 〚〛
+    dd: ❨❩
+    ee: ❪❫
+    ff: ❬❭
+    gg: ⦉⦊
+    ii: ⦍⦎
+    jj: ⦏⦐
+    kk: ⦑⦒
+    ll: ❮❯
+    mm: ⌈⌉
+    nn: ⌊⌋
+    oo: ⦗⦘
+    pp: ⦙⦚
+    qq: ⟬⟭
+    rr: ❴❵
+    ss: ⌜⌝
+    tt: ⌞⌟
+    uu: ⸢⸣
+    vv: ⸤⸥
+    ww: ﹁﹂
+    xx: ﹃﹄
+    yy: ⌠⌡
+    zz: ⟅⟆
+    md: '**|**'
+    jc: '**|**'
+    it: __|__
+    st: ~~|~~
+    eq: ==|==
+    ln: '`|`'
+    cb: '```|```'
+    qt: '> |'
+    ul: '- |'
+    ol: 1. |
+    lk: '[|](url)'
+    im: '![|](img)'
+    h: '# |'
+    hh: '## |'
+    hhh: '### |'
+    hhhh: '#### |'
+    sp: \|
+    br: '|  '
+    cm: <!--|-->
+    pl: ++
+    mi: --
+    sl: //
+    bs: \\
+    at: '@@'
+    dl: $$
+    pc: '%%'
+    an: '&&'
+    cr: ^^
+    cl: '::'
+    sc: ;;
+    ex: '!!'
+    qu: ??
+    sb: sb
+t2s:
+  option_name: t2s
+  opencc_config: wanxiang_t2s.json
+  tips: none
+  tags:
+  - abc
+t2hk:
+  option_name: t2hk
+  opencc_config: wanxiang_t2hk.json
+  tips: none
+  tags:
+  - abc
+t2tw:
+  option_name: t2tw
+  opencc_config: wanxiang_t2tw.json
+  tips: none
+  tags:
+  - abc

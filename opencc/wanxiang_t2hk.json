@@ -1,0 +1,17 @@
+{
+  "name": "wanxiang_t2hk",
+  "conversion_chain": [
+    {
+      "dict": {
+        "type": "group",
+        "match_policy": "short_circuit",
+        "dicts": [
+          {
+            "type": "ocd2",
+            "file": "wanxiang/HKVariants.ocd2"
+          }
+        ]
+      }
+    }
+  ]
+}
