@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.gram
+*.zip
+build/
+*.userdb/
