@@ -150,6 +150,21 @@ def build(args):
         counts = Counter(lines)
         write(variants, "\n".join(s for s in lines if counts[s] == 1) + "\n")
 
+    # Derive the missing Traditional-to-Simplified table from upstream phrase pairs.
+    ts_phrases = cc / "Custom_TSPhrases.txt"
+    if not ts_phrases.is_file():
+        reverse_phrases = {}
+        for line in read(cc / "Custom_STPhrases.txt").splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            simplified, traditional_values = line.split("\t", 1)
+            for traditional in traditional_values.split():
+                values = reverse_phrases.setdefault(traditional, [])
+                if simplified not in values:
+                    values.append(simplified)
+        write(ts_phrases, "\n".join(key + "\t" + " ".join(values)
+                                    for key, values in reverse_phrases.items()) + "\n")
+
     # Use the maintained custom configs verbatim instead of generating JSON.
     for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
         shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
