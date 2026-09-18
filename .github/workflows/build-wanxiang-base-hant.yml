@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.ref == 'refs/heads/main' || !inputs.publish
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,17 +75,7 @@ jobs:
                           archive.write(path, path.relative_to(root))
           PY
 
-      - name: Upload test packages
-        if: ${{ !inputs.publish }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: wanxiang-hant-test-packages
-          path: ${{ runner.temp }}/packages/*.zip
-          if-no-files-found: error
-          retention-days: 7
-
       - name: Save generated source
-        if: ${{ inputs.publish }}
         id: source
         run: |
           rsync -a --delete \
@@ -106,7 +96,6 @@ jobs:
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Publish Traditional packages
-        if: ${{ inputs.publish }}
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ steps.source.outputs.sha }}

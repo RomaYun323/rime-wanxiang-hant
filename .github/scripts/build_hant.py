@@ -60,6 +60,15 @@ def convert_dictionary(source, target):
     write(target, header + "\n..." + "".join(lines))
 
 
+def configure_traditional_schema(path):
+    """Use the Traditional-output OpenCC configs directly in the shipped schema."""
+    text = read(path)
+    for old, new in (("s2tw", "t2tw"), ("s2hk", "t2hk"),
+                     ("s2t", "t2s"), ("s2s", "t2t")):
+        text = text.replace(old, new)
+    write(path, text)
+
+
 def validate(root):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
@@ -121,6 +130,10 @@ def build(args):
     # Explicit directory allowlist: never include upstream's plum installer.
     for folder in ("lua", "opencc", "custom"):
         shutil.copytree(source / folder, root / folder)
+    for path in root.glob("*.schema.yaml"):
+        configure_traditional_schema(path)
+    for name in ("wanxiang_s2t.json", "wanxiang_s2hk.json", "wanxiang_s2tw.json"):
+        (root / "opencc" / name).unlink(missing_ok=True)
     shutil.copytree(lmdg / "dicts_hant", root / "dicts")
     # The official Hant set currently lacks these new 18.x auxiliary dictionaries.
     for name in ("abbrev", "t9_abbrev"):
@@ -166,10 +179,8 @@ def build(args):
                                     for key, values in reverse_phrases.items()) + "\n")
 
     # Use the maintained custom configs verbatim instead of generating JSON.
-    for original, replacement in (("s2t", "t2s"), ("s2hk", "t2hk"), ("s2tw", "t2tw")):
-        for name in (original, replacement):
-            shutil.copy2(custom / "opencc" / f"wanxiang_{replacement}.json",
-                         root / "opencc" / f"wanxiang_{name}.json")
+    for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
+        shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
 
     # Decode the upstream emoji dictionary, convert to Traditional, then compile below.
     emoji = cc / "emoji.txt"
