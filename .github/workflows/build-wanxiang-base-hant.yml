@@ -33,7 +33,8 @@ jobs:
             -o "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
           test -s "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
           mkdir -p "$RUNNER_TEMP/opencc-source"
-          for name in TSCharacters TSPhrases; do
+          # OpenCC 官方提供文字來源，缺少的標準詞典由這裡補齊後編譯。
+          for name in STCharacters STPhrases TSCharacters TSPhrases HKVariants TWVariants; do
             curl --fail --location --retry 5 --retry-all-errors \
               "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/${name}.txt" \
               -o "$RUNNER_TEMP/opencc-source/${name}.txt"

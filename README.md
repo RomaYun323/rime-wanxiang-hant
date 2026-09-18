@@ -16,3 +16,5 @@
 `custom_configs/zi.dict.新增部分.yaml` 會追加至字表；`custom_configs/修改TWVariants.txt` 保留原有「重複行移除、不同行新增」規則。這些檔案沿用 v17.10.3。舊的 `wanxiang.custom.yaml` 不套用，繁體模型和轉換規則直接由建置程式設定。
 
 每次抓取兩個上游的 wanxiang 分支最新快照，`build-info.json` 記錄實際提交。建置腳本先檢查字典、附屬方案與 OpenCC 依賴；有缺漏就停止，不發布不完整套件。修改腳本後仍應以實際 Rime 重新部署、測試候選與切換行為。
+
+OpenCC 標準轉換詞典優先沿用萬象已有檔案；缺少的 `STCharacters`、`STPhrases`、`TSCharacters`、`TSPhrases`、`HKVariants`、`TWVariants` 從 [OpenCC 官方文字詞典](https://github.com/BYVoid/OpenCC/tree/master/data/dictionary) 補齊，清除註解及空行後以 `opencc_dict` 編譯為 `.ocd2`。臺灣字形客製在編譯前套用；emoji 等萬象專用詞典仍由萬象提供。

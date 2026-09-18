@@ -33,6 +33,19 @@ def yaml_header(path):
     return yaml.safe_load(read(path).split("\n...", 1)[0])
 
 
+def supply_opencc_dictionaries(source, target):
+    """Preserve Wanxiang tables; fill missing standard dictionaries from OpenCC."""
+    for name in ("STCharacters", "STPhrases", "TSCharacters", "TSPhrases", "HKVariants", "TWVariants"):
+        text = target / (name + ".txt")
+        compiled = target / (name + ".ocd2")
+        if text.is_file() or (compiled.is_file() and compiled.stat().st_size > 0):
+            continue
+        supplied = source / text.name
+        if not supplied.is_file():
+            raise ValueError(f"Missing OpenCC source: {supplied}")
+        shutil.copy2(supplied, text)
+
+
 def convert_dictionary(source, target):
     # Only text changes: all codes, frequencies and other fields stay byte-for-byte.
     header, body = read(source).split("\n...", 1)
@@ -136,21 +149,19 @@ def build(args):
     fish = root / "dicts/wuzhong.dict.yaml"
     write(fish, read(fish).replace("蝨目魚", "虱目魚"))
 
-    variants = root / "opencc/wanxiang/TWVariants.txt"
+    cc = root / "opencc/wanxiang"
+    supply_opencc_dictionaries(args.opencc_source, cc)
+    variants = cc / "TWVariants.txt"
     changes = custom / "修改TWVariants.txt"
     if changes.is_file():
+        if not variants.is_file():
+            subprocess.run(["opencc_dict", "-i", str(variants.with_suffix(".ocd2")),
+                            "-o", str(variants), "-f", "ocd2", "-t", "text"], check=True)
         lines = [s.strip() for s in (read(variants) + "\n" + read(changes)).splitlines() if s.strip()]
         counts = Counter(lines)
         write(variants, "\n".join(s for s in lines if counts[s] == 1) + "\n")
 
     # Keep OpenCC's tab-separated key and space-separated alternatives intact.
-    cc = root / "opencc/wanxiang"
-    for name in ("TSCharacters", "TSPhrases"):
-        supplied = args.opencc_source / (name + ".txt")
-        if supplied.is_file():
-            shutil.copy2(supplied, cc / supplied.name)
-        else:
-            raise ValueError(f"Missing OpenCC source: {supplied}")
     opencc_config(root / "opencc/wanxiang_t2s.json", ["TSPhrases", "TSCharacters"])
     opencc_config(root / "opencc/wanxiang_t2hk.json", ["HKVariants"])
     opencc_config(root / "opencc/wanxiang_t2tw.json", ["TWVariants"])
@@ -177,13 +188,21 @@ def build(args):
         # Legacy Lua custom tables used tabs between alternatives; OpenCC uses spaces.
         normalized = []
         for line in read(path).splitlines():
-            if "\t" in line and not line.startswith("#"):
+            # Ubuntu's OpenCC 1.1 compiler rejects comments and blank lines.
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            if "\t" in line:
                 key, values = line.split("\t", 1)
                 line = key + "\t" + values.replace("\t", " ")
             normalized.append(line)
         write(path, "\n".join(normalized) + "\n")
-        subprocess.run(["opencc_dict", "-i", str(path), "-o", str(path.with_suffix(".ocd2")),
+        compiled = path.with_suffix(".ocd2")
+        compiled.unlink(missing_ok=True)
+        subprocess.run(["opencc_dict", "-i", str(path), "-o", str(compiled),
                         "-f", "text", "-t", "ocd2"], check=True)
+        # Some versions report dictionary errors while returning exit status 0.
+        if not compiled.is_file() or compiled.stat().st_size == 0:
+            raise ValueError(f"OpenCC did not compile dictionary: {path}")
 
     for name in ("wanxiang", "wanxiang_t9", "wanxiang_t9i"):
         configure_schema(root / (name + ".schema.yaml"))
