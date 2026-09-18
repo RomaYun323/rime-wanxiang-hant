@@ -1,197 +1,39 @@
-# Generated Traditional overrides; upstream schema is unchanged.
+# 本文件的工作目录是在用户根目录，本目录携带是因为如果放外面就会更新的时候覆盖你的修改，因此我只能藏起来。
+# 如果没有按初始化说明进行初始化那么你需要手动复制本文件到上层目录，请知悉。
 patch:
   speller/algebra:
     __patch:
-    - wanxiang_algebra:/base/全拼
-    - wanxiang_algebra:/26jian
+      #- wanxiang_algebra:/模糊音_nl
+      #- wanxiang_algebra:/模糊音_ry
+      #- wanxiang_algebra:/模糊音_hf
+      #- wanxiang_algebra:/模糊音_rl
+      #- wanxiang_algebra:/模糊音_kg
+      #- wanxiang_algebra:/模糊音_en_eng
+      #- wanxiang_algebra:/模糊音_in_ing
+      #- wanxiang_algebra:/模糊音_c_ch
+      #- wanxiang_algebra:/模糊音_z_zh
+      #- wanxiang_algebra:/模糊音_s_sh
+      - wanxiang_algebra:/base/全拼  
+      # 可选输入方案名称：全拼，自然码, 自然龙, 汉心龙，小鹤双拼, 搜狗双拼, 微软双拼, 智能ABC, 紫光双拼, 国标双拼，拼音加加，乱序17
+      - wanxiang_algebra:/26jian
+      #- wanxiang_algebra:/18jian
+      #- wanxiang_algebra:/14jian
+
+    
+  #这里改成什么就需要手动创建同名的 custom_phrasexx.txt 文件在用户目录，这个文件主要用于置顶，编码为自定义编码的词汇
+  #custom_phrase/user_dict: custom_phrasexx
+    
+  #导入根目录下名称为userxx.dict.yaml的自定义固定词典，编码要与固定词库一致，编码权重都不要少，形如姓名、专有名词公司名称等等
+  #translator/packs/+:
+  #  - userxx
+
+  #下面是候选数量
   menu/page_size: 6
-  grammar/language: wanxiang-lts-zh-hant
-  t2s:
-    option_name: t2s
-    opencc_config: wanxiang_t2s.json
-    tips: none
-    tags:
-    - abc
-  t2hk:
-    option_name: t2hk
-    opencc_config: wanxiang_t2hk.json
-    tips: none
-    tags:
-    - abc
-  t2tw:
-    option_name: t2tw
-    opencc_config: wanxiang_t2tw.json
-    tips: none
-    tags:
-    - abc
-  switches:
-  - name: ascii_mode
-    states:
-    - 中文
-    - 英文
-  - name: ascii_punct
-    states:
-    - 中标
-    - 英标
-  - name: full_shape
-    states:
-    - 半角
-    - 全角
-  - name: emoji
-    states:
-    - 表情关
-    - 表情开
-  - name: chinese_english
-    states:
-    - 翻译关
-    - 翻译开
-  - name: context_reorder
-    states:
-    - 上下文关
-    - 上下文开
-  - options:
-    - raw_input
-    - tone_display
-    - full_pinyin
-    states:
-    - 原编码
-    - 有声调
-    - 无声调
-  - options:
-    - t2t
-    - t2s
-    - t2hk
-    - t2tw
-    states:
-    - 通繁
-    - 簡體
-    - 港繁
-    - 臺繁
-    reset: 3
-  - name: abbrev
-    states:
-    - 简码关
-    - 简码开
-    reset: 1
-  - options:
-    - comment_off
-    - tone_hint
-    - toneless_hint
-    states:
-    - 注释关
-    - 有声调
-    - 无声调
-  - name: super_tips
-    states:
-    - 提示关
-    - 提示开
-  - name: charset_filter
-    states:
-    - 大字集
-    - 小字集
-  - name: char_priority
-    states:
-    - 词组先
-    - 单字先
-  - name: english
-    reset: 1
-    states:
-    - 英文关
-    - 英文开
-  engine/filters:
-  - lua_filter@*wanxiang.charset_filter
-  - lua_filter@*wanxiang.super_lookup
-  - lua_filter@*wanxiang.custom_phrase
-  - lua_filter@*wanxiang.context_reorder*F
-  - lua_filter@*wanxiang.charset_filter
-  - lua_filter@*wanxiang.super_comment_preedit
-  - simplifier@t2s
-  - simplifier@t2hk
-  - simplifier@t2sw
-  - simplifier@emoji
-  - lua_filter@*wanxiang.super_replacer
-  - lua_filter@*wanxiang.super_filter
-  - lua_filter@*wanxiang.super_english*F
-  - lua_filter@*wanxiang.super_sequence*F
-  - uniquifier
-  charset_filter:
-  - option: charset_filter
-    base: fth
-    addlist:
-    - 诶濛硷氽尛躝〇冇吔磺咗囧屌鲶芶咲畑垅𰻝𰻞龍朙頔雲
-    blacklist: []
-  - option: t2s
-    base: fth
-    addlist: []
-    blacklist: []
-  - option: t2hk
-    base: fth
-    addlist: []
-    blacklist: []
-  - option: t2tw
-    base: fth
-    addlist: []
-    blacklist: []
-  key_binder/bindings:
-  - when: has_menu
-    accept: minus
-    send: Page_Up
-  - when: has_menu
-    accept: equal
-    send: Page_Down
-  - when: always
-    toggle: ascii_punct
-    accept: Control+Shift+3
-  - when: always
-    toggle: ascii_punct
-    accept: Control+Shift+numbersign
-  - when: always
-    toggle: t2s
-    accept: Control+Shift+4
-  - when: always
-    toggle: t2s
-    accept: Control+Shift+dollar
-  - when: composing
-    accept: Alt+Left
-    send: Shift+Left
-  - when: composing
-    accept: Alt+Right
-    send: Shift+Right
-  - when: composing
-    accept: Control+w
-    send: Control+BackSpace
-  - when: has_menu
-    accept: Control+e
-    toggle: chinese_english
-  - when: has_menu
-    accept: Control+a
-    toggle: tone_hint
-  - when: has_menu
-    accept: Control+s
-    toggle: tone_display
-  - when: has_menu
-    accept: Control+t
-    toggle: super_tips
-  - when: has_menu
-    accept: Control+g
-    toggle: charset_filter
-  - when: composing
-    accept: Control+g
-    toggle: charset_filter
-  - when: always
-    accept: Shift+space
-    select: .next
-  - when: has_menu
-    accept: Tab
-    send: Control+Right
-  - when: composing
-    accept: Tab
-    send: Control+Right
-  - when: composing
-    accept: Control+Tab
-    send_sequence: '{Home}{Shift+Right}{1}{Shift+Right}'
-  - match: ^/$
-    accept: /
-    send_sequence: '{space}'
-  - accept: Shift+Return
-    send_sequence: '{option:tone_display=true}{Shift+Return}{option:tone_display=false}'
+
+  #以下恢复``造词功能，也就是平时不记录，引导才记录，按需造词，如果你想恢复这个功能，请取消注释----
+  #recognizer/patterns/add_user_dict: "^``[A-Za-z/`']*$"      #自造词引导方式
+  #user_dict_set/enable_user_dict: true
+  #add_user_dict/enable_user_dict: true
+  # 取消注释以开启自动无词频造词
+  #add_user_dict/enable_auto_phrase: true
+

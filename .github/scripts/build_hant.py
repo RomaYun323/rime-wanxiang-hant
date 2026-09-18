@@ -60,52 +60,6 @@ def convert_dictionary(source, target):
     write(target, header + "\n..." + "".join(lines))
 
 
-def configure_schema(path):
-    data = yaml.safe_load(read(path))
-    patch = {}
-    options = {"s2s": "t2t", "s2t": "t2s", "s2hk": "t2hk", "s2tw": "t2tw"}
-    group = next(s for s in data["switches"] if s.get("options") == list(options))
-    group.update(options=list(options.values()), states=["通繁", "簡體", "港繁", "臺繁"], reset=3)
-    patch["grammar/language"] = "wanxiang-lts-zh-hant"
-    for old, new in list(options.items())[1:]:
-        data["engine"]["filters"] = [f.replace("simplifier@" + old, "simplifier@" + new)
-                                        for f in data["engine"]["filters"]]
-        node = data.pop(old)
-        node.update(option_name=new, opencc_config=f"wanxiang_{new}.json")
-        patch[new] = node
-    # Filtering precedes conversion: even Simplified output must admit Traditional input.
-    for entry in data["charset_filter"]:
-        entry["option"] = options.get(entry["option"], entry["option"])
-        entry["base"] = "fth"
-    for binding in data.get("key_binder", {}).get("bindings", []):
-        for key in ("toggle", "set_option", "unset_option"):
-            if binding.get(key) in options:
-                binding[key] = options[binding[key]]
-    patch["switches"] = data["switches"]
-    patch["engine/filters"] = data["engine"]["filters"]
-    patch["charset_filter"] = data["charset_filter"]
-    if "bindings" in data.get("key_binder", {}):
-        patch["key_binder/bindings"] = data["key_binder"]["bindings"]
-    custom_name = path.name.replace(".schema.yaml", ".custom.yaml")
-    template = path.parent / "custom" / custom_name
-    custom = yaml.safe_load(read(template)) if template.is_file() else {"patch": {}}
-    custom.setdefault("patch", {}).update(patch)
-    text = "# Generated Traditional overrides; upstream schema is unchanged.\n" + yaml.safe_dump(
-        custom, allow_unicode=True, sort_keys=False, width=120)
-    write(path.parent / custom_name, text)
-    # set_schema can copy this template when switching input methods.
-    write(template, text)
-
-
-def opencc_config(path, filenames):
-    dictionaries = [{"type": "ocd2", "file": "wanxiang/" + f + ".ocd2"} for f in filenames]
-    group = {"type": "group", "match_policy": "short_circuit", "dicts": dictionaries}
-    data = {"name": path.stem, "conversion_chain": [{"dict": group}]}
-    if len(dictionaries) > 1:
-        data["segmentation"] = {"type": "mmseg", "dict": group}
-    write(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
-
-
 def validate(root):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
@@ -121,7 +75,16 @@ def validate(root):
                 if not (root / "opencc" / node["opencc_config"]).is_file():
                     raise ValueError(f"Missing OpenCC config: {node}")
     for path in root.glob("*.custom.yaml"):
-        for node in yaml.safe_load(read(path)).get("patch", {}).values():
+        patch = yaml.safe_load(read(path)).get("patch", {})
+        schema = root / path.name.replace(".custom.yaml", ".schema.yaml")
+        data = yaml.safe_load(read(schema)) if schema.is_file() else {}
+        for filter_name in patch.get("engine/filters", []):
+            if filter_name.startswith("simplifier@"):
+                name = filter_name.split("@", 1)[1]
+                node = patch.get(name, data.get(name))
+                if not isinstance(node, dict) or "opencc_config" not in node:
+                    raise ValueError(f"Missing simplifier configuration in {path.name}: {name}")
+        for node in patch.values():
             if isinstance(node, dict) and "opencc_config" in node:
                 if not (root / "opencc" / node["opencc_config"]).is_file():
                     raise ValueError(f"Missing OpenCC config in {path.name}: {node}")
@@ -135,7 +98,11 @@ def validate(root):
             for value in node:
                 check_files(value)
     for path in (root / "opencc").glob("*.json"):
-        check_files(json.loads(read(path)))
+        config = json.loads(read(path))
+        if path.stem in {"wanxiang_t2s", "wanxiang_t2hk", "wanxiang_t2tw"}:
+            if not isinstance(config.get("segmentation"), dict):
+                raise ValueError(f"Missing OpenCC 1.x segmentation: {path.name}")
+        check_files(config)
 
 
 def build(args):
@@ -145,9 +112,13 @@ def build(args):
     if not (lmdg / "dicts_hant/zi.dict.yaml").is_file():
         raise ValueError("Official dicts_hant is missing")
     root.mkdir(parents=True)
+    # The workflow supplies wanxiang-base; copy its root scheme/data files only.
     for path in source.iterdir():
+        if path.name.endswith(".custom.yaml"):
+            continue
         if path.is_file() and (path.suffix in {".yaml", ".txt"} or path.name == "LICENSE"):
             shutil.copy2(path, root / path.name)
+    # Explicit directory allowlist: never include upstream's plum installer.
     for folder in ("lua", "opencc", "custom"):
         shutil.copytree(source / folder, root / folder)
     shutil.copytree(lmdg / "dicts_hant", root / "dicts")
@@ -179,17 +150,19 @@ def build(args):
         counts = Counter(lines)
         write(variants, "\n".join(s for s in lines if counts[s] == 1) + "\n")
 
-    # Keep OpenCC's tab-separated key and space-separated alternatives intact.
-    opencc_config(root / "opencc/wanxiang_t2s.json", ["TSPhrases", "TSCharacters"])
-    opencc_config(root / "opencc/wanxiang_t2hk.json", ["HKVariants"])
-    opencc_config(root / "opencc/wanxiang_t2tw.json", ["TWVariants"])
+    # Use the maintained custom configs verbatim instead of generating JSON.
+    for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
+        shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
 
-    # Include all supported output spellings so emoji works after any output conversion.
+    # Decode the upstream emoji dictionary, convert to Traditional, then compile below.
     emoji = cc / "emoji.txt"
-    original = read(emoji)
-    lines = original.splitlines()
-    for config in ("s2t.json", "s2hk.json", "s2tw.json"):
-        lines.extend(convert(original, config).splitlines())
+    compiled_emoji = emoji.with_suffix(".ocd2")
+    if compiled_emoji.is_file():
+        subprocess.run(["opencc_dict", "-i", str(compiled_emoji), "-o", str(emoji),
+                        "-f", "ocd2", "-t", "text"], check=True)
+    # Upstream may ship only text; use it directly in that case.
+    lines = convert(read(emoji), "s2t.json").splitlines()
+    # Different Simplified keys can become the same Traditional key.
     mapping = {}
     for line in lines:
         if not line or line.startswith("#"):
@@ -221,15 +194,6 @@ def build(args):
         # Some versions report dictionary errors while returning exit status 0.
         if not compiled.is_file() or compiled.stat().st_size == 0:
             raise ValueError(f"OpenCC did not compile dictionary: {path}")
-
-    for name in ("wanxiang", "wanxiang_t9", "wanxiang_t9i"):
-        configure_schema(root / (name + ".schema.yaml"))
-    defaults = root / "default.yaml"
-    options = {"s2t": "t2s", "s2hk": "t2hk", "s2tw": "t2tw"}
-    saved = yaml.safe_load(read(defaults))["switcher"]["save_options"]
-    write(root / "default.custom.yaml", yaml.safe_dump({"patch": {
-        "switcher/save_options": [options.get(value, value) for value in saved]
-    }}, allow_unicode=True, sort_keys=False))
 
     for name in ("chinese_english", "english_chinese", "others", "tips_show", "sentence"):
         path = root / "lua/data" / (name + ".txt")

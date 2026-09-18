@@ -1,7 +1,12 @@
 name: Build wanxiang-base-hant
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: '提交生成檔案並發布 Release（關閉時只測試及上傳 ZIP）'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -26,7 +31,7 @@ jobs:
 
       - name: Fetch upstream scheme and official Traditional dictionaries
         run: |
-          git clone --depth 1 --branch wanxiang https://github.com/amzxyz/rime-wanxiang.git "$RUNNER_TEMP/wanxiang"
+          git clone --depth 1 --branch wanxiang-base https://github.com/amzxyz/rime-wanxiang.git "$RUNNER_TEMP/wanxiang"
           git clone --depth 1 --branch wanxiang https://github.com/amzxyz/RIME-LMDG.git "$RUNNER_TEMP/lmdg"
           curl --fail --location --retry 5 --retry-all-errors \
             https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hant.gram \
@@ -48,10 +53,49 @@ jobs:
             --custom custom_configs \
             --opencc-source "$RUNNER_TEMP/opencc-source" \
             --output "$RUNNER_TEMP/hant" \
-            --gram "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram" \
-            --archives "$RUNNER_TEMP/packages"
+            --gram "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
+
+      - name: Apply custom OpenCC configs and package
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import runpy
+          import shutil
+          import zipfile
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "hant"
+          custom = Path("custom_configs/opencc")
+          # 同時更新繁體補丁與上游 schema 引用的設定。
+          for original, replacement in (("s2t", "t2s"), ("s2hk", "t2hk"), ("s2tw", "t2tw")):
+              source = custom / f"wanxiang_{replacement}.json"
+              for name in (original, replacement):
+                  shutil.copy2(source, root / "opencc" / f"wanxiang_{name}.json")
+
+          runpy.run_path(".github/scripts/build_hant.py")["validate"](root)
+          gram = root / "wanxiang-lts-zh-hant.gram"
+          if not gram.is_file() or gram.stat().st_size == 0:
+              raise ValueError("Traditional language model is missing or empty")
+          packages = Path(os.environ["RUNNER_TEMP"]) / "packages"
+          packages.mkdir(parents=True, exist_ok=True)
+          for kind in ("base", "full"):
+              with zipfile.ZipFile(packages / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+                  for path in sorted(root.rglob("*")):
+                      if path.is_file() and not (kind == "base" and path.suffix == ".gram"):
+                          archive.write(path, path.relative_to(root))
+          PY
+
+      - name: Upload test packages
+        if: ${{ !inputs.publish }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: wanxiang-hant-test-packages
+          path: ${{ runner.temp }}/packages/*.zip
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Save generated source
+        if: ${{ inputs.publish }}
         id: source
         run: |
           rsync -a --delete \
@@ -69,18 +113,19 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           VERSION=$(tr -d '\r\n' < version.txt)
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "tag=v${VERSION}-hant.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Publish Traditional packages
+        if: ${{ inputs.publish }}
         uses: softprops/action-gh-release@v2
         with:
           target_commitish: ${{ steps.source.outputs.sha }}
           tag_name: ${{ steps.source.outputs.tag }}
-          name: ${{ steps.source.outputs.tag }} 萬象拼音繁體方案
+          name: ${{ steps.source.outputs.tag }} Rime万象拼音输入方案-繁體詞庫
           fail_on_unmatched_files: true
           body: |
-            上游 wanxiang 方案搭配 RIME-LMDG 官方 dicts_hant 繁體詞庫。
-            保留上游 schema 原檔，隨包提供新版 custom 補丁，預設臺灣字形。
+            上游 wanxiang-base 方案搭配 RIME-LMDG 官方 dicts_hant 繁體詞庫，不包含 plum 安裝工具。
+            保留上游 schema 原檔，主目錄不附帶 custom 補丁；個人繁體設定請自行套用。
             - rime-wanxiang-base.zip：不含語言模型，另放入 wanxiang-lts-zh-hant.gram。
             - rime-wanxiang-full.zip：包含繁體語言模型。
             升級前請備份並合併個人 custom 設定；請移除舊版針對 super_replacer 的繁體補丁。
