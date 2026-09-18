@@ -194,7 +194,7 @@ def build(args):
     for path in cc.glob("*.txt"):
         if path.stem in {"Custom_STPhrases", "STPhrases", "STCharacters"}:
             continue
-        if path.name.startswith("Custom_") and path != ts_phrases:
+        if path.name.startswith("Custom_"):
             continue
         # Legacy Lua custom tables used tabs between alternatives; OpenCC uses spaces.
         normalized = []
