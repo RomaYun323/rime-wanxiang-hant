@@ -13,7 +13,9 @@
 
 `.github/scripts/build_hant.py` 保留官方繁體主詞庫。若官方繁體目錄缺少新版 `abbrev`、`t9_abbrev`，只將上游簡碼詞典的文字欄轉繁，保留編碼及詞頻。保留 OpenCC JSON，編譯所有引用的 `.ocd2`；保留 LICENSE。
 
-`custom_configs/zi.dict.新增部分.yaml` 會追加至字表；`custom_configs/修改TWVariants.txt` 保留原有「重複行移除、不同行新增」規則。這些檔案沿用 v17.10.3。舊的 `wanxiang.custom.yaml` 不套用，繁體模型和轉換規則直接由建置程式設定。
+`custom_configs/zi.dict.新增部分.yaml` 會追加至字表；`custom_configs/修改TWVariants.txt` 保留原有「重複行移除、不同行新增」規則。這些檔案沿用 v17.10.3。
+
+保留上游 `wanxiang.schema.yaml`、`wanxiang_t9.schema.yaml`、`wanxiang_t9i.schema.yaml` 與 `default.yaml` 原檔。繁體設定由建置程式產生在根目錄的 `wanxiang.custom.yaml`、`wanxiang_t9.custom.yaml`、`wanxiang_t9i.custom.yaml` 及 `default.custom.yaml`。方案補丁亦同步至 `custom/` 模板，供切換輸入方案使用。發布包包含這些補丁；安裝前請備份並合併個人 custom 設定。
 
 每次抓取兩個上游的 wanxiang 分支最新快照，`build-info.json` 記錄實際提交。建置腳本先檢查字典、附屬方案與 OpenCC 依賴；有缺漏就停止，不發布不完整套件。修改腳本後仍應以實際 Rime 重新部署、測試候選與切換行為。
 

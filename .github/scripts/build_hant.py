@@ -62,16 +62,17 @@ def convert_dictionary(source, target):
 
 def configure_schema(path):
     data = yaml.safe_load(read(path))
+    patch = {}
     options = {"s2s": "t2t", "s2t": "t2s", "s2hk": "t2hk", "s2tw": "t2tw"}
     group = next(s for s in data["switches"] if s.get("options") == list(options))
     group.update(options=list(options.values()), states=["通繁", "簡體", "港繁", "臺繁"], reset=3)
-    data["grammar"]["language"] = "wanxiang-lts-zh-hant"
+    patch["grammar/language"] = "wanxiang-lts-zh-hant"
     for old, new in list(options.items())[1:]:
         data["engine"]["filters"] = [f.replace("simplifier@" + old, "simplifier@" + new)
                                         for f in data["engine"]["filters"]]
         node = data.pop(old)
         node.update(option_name=new, opencc_config=f"wanxiang_{new}.json")
-        data[new] = node
+        patch[new] = node
     # Filtering precedes conversion: even Simplified output must admit Traditional input.
     for entry in data["charset_filter"]:
         entry["option"] = options.get(entry["option"], entry["option"])
@@ -80,8 +81,20 @@ def configure_schema(path):
         for key in ("toggle", "set_option", "unset_option"):
             if binding.get(key) in options:
                 binding[key] = options[binding[key]]
-    write(path, "# Generated Traditional scheme; edit .github/scripts/build_hant.py\n" +
-          yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=120))
+    patch["switches"] = data["switches"]
+    patch["engine/filters"] = data["engine"]["filters"]
+    patch["charset_filter"] = data["charset_filter"]
+    if "bindings" in data.get("key_binder", {}):
+        patch["key_binder/bindings"] = data["key_binder"]["bindings"]
+    custom_name = path.name.replace(".schema.yaml", ".custom.yaml")
+    template = path.parent / "custom" / custom_name
+    custom = yaml.safe_load(read(template)) if template.is_file() else {"patch": {}}
+    custom.setdefault("patch", {}).update(patch)
+    text = "# Generated Traditional overrides; upstream schema is unchanged.\n" + yaml.safe_dump(
+        custom, allow_unicode=True, sort_keys=False, width=120)
+    write(path.parent / custom_name, text)
+    # set_schema can copy this template when switching input methods.
+    write(template, text)
 
 
 def opencc_config(path, filenames):
@@ -107,6 +120,11 @@ def validate(root):
             if isinstance(node, dict) and "opencc_config" in node:
                 if not (root / "opencc" / node["opencc_config"]).is_file():
                     raise ValueError(f"Missing OpenCC config: {node}")
+    for path in root.glob("*.custom.yaml"):
+        for node in yaml.safe_load(read(path)).get("patch", {}).values():
+            if isinstance(node, dict) and "opencc_config" in node:
+                if not (root / "opencc" / node["opencc_config"]).is_file():
+                    raise ValueError(f"Missing OpenCC config in {path.name}: {node}")
     def check_files(node):
         if isinstance(node, dict):
             if "file" in node and not (root / "opencc" / node["file"]).is_file():
@@ -207,10 +225,11 @@ def build(args):
     for name in ("wanxiang", "wanxiang_t9", "wanxiang_t9i"):
         configure_schema(root / (name + ".schema.yaml"))
     defaults = root / "default.yaml"
-    text = read(defaults)
-    for old, new in (("s2t", "t2s"), ("s2hk", "t2hk"), ("s2tw", "t2tw")):
-        text = re.sub(r"\b" + old + r"\b", new, text)
-    write(defaults, text)
+    options = {"s2t": "t2s", "s2hk": "t2hk", "s2tw": "t2tw"}
+    saved = yaml.safe_load(read(defaults))["switcher"]["save_options"]
+    write(root / "default.custom.yaml", yaml.safe_dump({"patch": {
+        "switcher/save_options": [options.get(value, value) for value in saved]
+    }}, allow_unicode=True, sort_keys=False))
 
     for name in ("chinese_english", "english_chinese", "others", "tips_show", "sentence"):
         path = root / "lua/data" / (name + ".txt")
