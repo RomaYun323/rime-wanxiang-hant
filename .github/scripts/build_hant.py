@@ -127,11 +127,11 @@ def build(args):
     for name in ("wanxiang_s2t.json", "wanxiang_s2hk.json", "wanxiang_s2tw.json"):
         (root / "opencc" / name).unlink(missing_ok=True)
     shutil.copytree(lmdg / "dicts_hant", root / "dicts")
-    # The official Hant set currently lacks these new 18.x auxiliary dictionaries.
-    for name in ("abbrev", "t9_abbrev"):
-        target = root / "dicts" / (name + ".dict.yaml")
+    # Prefer official Hant dictionaries; convert missing tables from the scheme.
+    for path in (source / "dicts").glob("*.dict.yaml"):
+        target = root / "dicts" / path.name
         if not target.exists():
-            convert_dictionary(source / "dicts" / target.name, target)
+            convert_dictionary(path, target)
     convert_dictionary(source / "custom_phrase.dict.yaml", root / "custom_phrase.dict.yaml")
     custom = args.custom
     additions = custom / "zi.dict.新增部分.yaml"
