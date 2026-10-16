@@ -61,6 +61,31 @@ def convert_dictionary(source, target):
     write(target, header + "\n..." + "".join(lines))
 
 
+def resolve_opencc_formats(root):
+    """Use supplied text when a config refers to an absent binary dictionary."""
+    def resolve(node):
+        changed = False
+        if isinstance(node, dict):
+            filename = node.get("file")
+            if node.get("type") == "ocd2" and filename:
+                binary = root / "opencc" / filename
+                text = binary.with_suffix(".txt")
+                if not binary.is_file() and text.is_file():
+                    node.update(type="text", file=text.relative_to(root / "opencc").as_posix())
+                    changed = True
+            for value in node.values():
+                changed = resolve(value) or changed
+        elif isinstance(node, list):
+            for value in node:
+                changed = resolve(value) or changed
+        return changed
+
+    for path in (root / "opencc").glob("*.json"):
+        config = json.loads(read(path))
+        if resolve(config):
+            write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+
+
 def validate(root):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
@@ -199,7 +224,8 @@ def build(args):
                 bucket.append(value)
     write(emoji, "\n".join(k + "\t" + " ".join(v) for k, v in mapping.items()) + "\n")
     # Preserve upstream formats. Only rebuild existing binary dictionaries whose
-    # text was edited; never compile text-only tables or rewrite JSON references.
+    # text was edited. Resolve missing binaries to text without compiling it.
+    resolve_opencc_formats(root)
     referenced_text_tables = set()
     def collect_text_tables(node):
         if isinstance(node, dict):

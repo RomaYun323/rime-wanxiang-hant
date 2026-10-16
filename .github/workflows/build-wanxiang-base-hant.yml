@@ -72,6 +72,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y opencc python3-yaml rsync
 
+      - name: Test OpenCC format preservation
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
       - name: Fetch upstream scheme and official Traditional dictionaries
         run: |
           git clone --depth 1 --branch wanxiang-base https://github.com/amzxyz/rime-wanxiang.git "$RUNNER_TEMP/wanxiang"
@@ -81,7 +84,7 @@ jobs:
             -o "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
           test -s "$RUNNER_TEMP/wanxiang-lts-zh-hant.gram"
           mkdir -p "$RUNNER_TEMP/opencc-source"
-          # OpenCC 官方提供文字來源，缺少的標準詞典由這裡補齊後編譯。
+          # OpenCC 官方提供文字來源，缺少的標準詞典保留文字格式。
           for name in TSCharacters TSPhrases HKVariants TWVariants; do
             curl --fail --location --retry 5 --retry-all-errors \
               "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/${name}.txt" \
