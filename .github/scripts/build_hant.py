@@ -144,6 +144,8 @@ def build(args):
     write(fish, read(fish).replace("蝨目魚", "虱目魚"))
 
     cc = root / "opencc/wanxiang"
+    upstream_text_tables = {path.name for path in cc.glob("*.txt")}
+    upstream_compiled_tables = {path.name for path in cc.glob("*.ocd2")}
     supply_opencc_dictionaries(args.opencc_source, cc)
     variants = cc / "TWVariants.txt"
     changes = custom / "修改TWVariants.txt"
@@ -174,7 +176,7 @@ def build(args):
     for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
         shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
 
-    # Decode the upstream emoji dictionary, convert to Traditional, then compile below.
+    # Decode the upstream emoji dictionary for editing; restore its format below.
     emoji = cc / "emoji.txt"
     compiled_emoji = emoji.with_suffix(".ocd2")
     if compiled_emoji.is_file():
@@ -196,11 +198,27 @@ def build(args):
             if value and value not in bucket:
                 bucket.append(value)
     write(emoji, "\n".join(k + "\t" + " ".join(v) for k, v in mapping.items()) + "\n")
-    compiled_tables = {}
+    # Preserve upstream formats. Only rebuild existing binary dictionaries whose
+    # text was edited; never compile text-only tables or rewrite JSON references.
+    referenced_text_tables = set()
+    def collect_text_tables(node):
+        if isinstance(node, dict):
+            if node.get("type") == "text" and "file" in node:
+                referenced_text_tables.add(node["file"])
+            for value in node.values():
+                collect_text_tables(value)
+        elif isinstance(node, list):
+            for value in node:
+                collect_text_tables(value)
+    for config_path in (root / "opencc").glob("*.json"):
+        collect_text_tables(json.loads(read(config_path)))
     for path in cc.glob("*.txt"):
-        if path.stem in {"Custom_STPhrases", "STPhrases", "STCharacters"}:
+        compiled = path.with_suffix(".ocd2")
+        if compiled.name not in upstream_compiled_tables:
             continue
-        if path.name.startswith("Custom_"):
+        if path.name not in {"emoji.txt", "TWVariants.txt"}:
+            continue
+        if path.name == "TWVariants.txt" and not changes.is_file():
             continue
         # Legacy Lua custom tables used tabs between alternatives; OpenCC uses spaces.
         normalized = []
@@ -213,32 +231,15 @@ def build(args):
                 line = key + "\t" + values.replace("\t", " ")
             normalized.append(line)
         write(path, "\n".join(normalized) + "\n")
-        compiled = path.with_suffix(".ocd2")
         compiled.unlink(missing_ok=True)
         subprocess.run(["opencc_dict", "-i", str(path), "-o", str(compiled),
                         "-f", "text", "-t", "ocd2"], check=True)
         # Some versions report dictionary errors while returning exit status 0.
         if not compiled.is_file() or compiled.stat().st_size == 0:
             raise ValueError(f"OpenCC did not compile dictionary: {path}")
-        compiled_tables[path.relative_to(root / "opencc").as_posix()] = compiled.relative_to(root / "opencc").as_posix()
-
-    # Adapt output configs only; user-maintained JSON sources stay untouched.
-    def use_compiled_tables(node):
-        if isinstance(node, dict):
-            if node.get("type") == "text" and node.get("file") in compiled_tables:
-                node.update(type="ocd2", file=compiled_tables[node["file"]])
-            for value in node.values():
-                use_compiled_tables(value)
-        elif isinstance(node, list):
-            for value in node:
-                use_compiled_tables(value)
-
-    for path in (root / "opencc").glob("*.json"):
-        config = json.loads(read(path))
-        use_compiled_tables(config)
-        write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
-    for filename in compiled_tables:
-        (root / "opencc" / filename).unlink()
+        if (path.name not in upstream_text_tables
+                and path.relative_to(root / "opencc").as_posix() not in referenced_text_tables):
+            path.unlink()
     for filename in ("Custom_STPhrases.txt", "Custom_STPhrases.ocd2",
                      "STPhrases.txt", "STPhrases.ocd2", "STCharacters.txt", "STCharacters.ocd2"):
         (cc / filename).unlink(missing_ok=True)
