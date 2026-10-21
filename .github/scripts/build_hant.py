@@ -1,4 +1,4 @@
-"""Build a standalone Traditional Base scheme from two upstream snapshots."""
+"""從兩份上游快照建立獨立的繁體基礎方案。"""
 import argparse
 from collections import Counter
 import hashlib
@@ -35,11 +35,10 @@ def yaml_header(path):
 
 
 def supply_opencc_dictionaries(source, target):
-    """Preserve Wanxiang tables; fill missing standard dictionaries from OpenCC."""
+    """為萬象缺少的標準詞典補上文字來源。"""
     for name in ("TSCharacters", "TSPhrases", "HKVariants", "TWVariants"):
         text = target / (name + ".txt")
-        compiled = target / (name + ".ocd2")
-        if text.is_file() or (compiled.is_file() and compiled.stat().st_size > 0):
+        if text.is_file():
             continue
         supplied = source / text.name
         if not supplied.is_file():
@@ -48,7 +47,7 @@ def supply_opencc_dictionaries(source, target):
 
 
 def convert_dictionary(source, target):
-    # Only text changes: all codes, frequencies and other fields stay byte-for-byte.
+    # 僅轉換文字；編碼、詞頻及其他欄位皆逐位元組保持不變。
     header, body = read(source).split("\n...", 1)
     lines = body.splitlines(keepends=True)
     indices = [i for i, line in enumerate(lines) if "\t" in line and not line.startswith("#")]
@@ -61,32 +60,81 @@ def convert_dictionary(source, target):
     write(target, header + "\n..." + "".join(lines))
 
 
-def resolve_opencc_formats(root):
-    """Use supplied text when a config refers to an absent binary dictionary."""
-    def resolve(node):
-        changed = False
+def rewrite_opencc_format(root, source_type, target_type):
+    """對應的目標檔存在時，改寫詞典格式引用。"""
+    suffixes = {"text": ".txt", "ocd2": ".ocd2"}
+    source_suffix = suffixes[source_type]
+    target_suffix = suffixes[target_type]
+
+    def rewrite(node):
         if isinstance(node, dict):
             filename = node.get("file")
-            if node.get("type") == "ocd2" and filename:
-                binary = root / "opencc" / filename
-                text = binary.with_suffix(".txt")
-                if not binary.is_file() and text.is_file():
-                    node.update(type="text", file=text.relative_to(root / "opencc").as_posix())
-                    changed = True
+            if node.get("type") == source_type and filename and filename.endswith(source_suffix):
+                target_name = filename[:-len(source_suffix)] + target_suffix
+                if (root / "opencc" / target_name).is_file():
+                    node.update(type=target_type, file=target_name)
             for value in node.values():
-                changed = resolve(value) or changed
+                rewrite(value)
         elif isinstance(node, list):
             for value in node:
-                changed = resolve(value) or changed
-        return changed
+                rewrite(value)
 
     for path in (root / "opencc").glob("*.json"):
         config = json.loads(read(path))
-        if resolve(config):
-            write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+        rewrite(config)
+        write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
 
 
-def validate(root):
+def prepare_source_opencc(root):
+    """讓倉庫詞典維持可讀文字格式，並讓 JSON 指向文字檔。"""
+    dictionary_root = root / "opencc/wanxiang"
+    for compiled in dictionary_root.glob("*.ocd2"):
+        text = compiled.with_suffix(".txt")
+        if not text.is_file():
+            subprocess.run(["opencc_dict", "-i", str(compiled), "-o", str(text),
+                            "-f", "ocd2", "-t", "text"], check=True)
+        if not text.is_file() or text.stat().st_size == 0:
+            raise ValueError(f"OpenCC did not decode dictionary: {compiled}")
+        compiled.unlink()
+    rewrite_opencc_format(root, "ocd2", "text")
+
+
+def prepare_release_opencc(root):
+    """編譯一般文字詞典，並保留 Release 內的自訂文字詞典。"""
+    dictionary_root = root / "opencc/wanxiang"
+    all_texts = list(dictionary_root.glob("*.txt"))
+    if not all_texts:
+        raise ValueError(f"No OpenCC text dictionaries found: {dictionary_root}")
+    preserved_texts = {"Custom_Emoji.txt", "Custom_TSPhrases.txt"}
+    compiled_texts = [text for text in all_texts if text.name not in preserved_texts]
+    for text in compiled_texts:
+        normalized = []
+        for line in read(text).splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            if "\t" in line:
+                key, values = line.split("\t", 1)
+                line = key + "\t" + values.replace("\t", " ")
+            normalized.append(line)
+        write(text, "\n".join(normalized) + "\n")
+        compiled = text.with_suffix(".ocd2")
+        compiled.unlink(missing_ok=True)
+        subprocess.run(["opencc_dict", "-i", str(text), "-o", str(compiled),
+                        "-f", "text", "-t", "ocd2"], check=True)
+        if not compiled.is_file() or compiled.stat().st_size == 0:
+            raise ValueError(f"OpenCC did not compile dictionary: {text}")
+    rewrite_opencc_format(root, "text", "ocd2")
+    for text in compiled_texts:
+        text.unlink()
+
+
+def copy_custom_opencc_configs(custom, root):
+    """將維護中的繁轉設定原樣複製到輸出目錄。"""
+    for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
+        shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
+
+
+def validate(root, allow_release_sources=False):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
             if not (root / (table + ".dict.yaml")).is_file():
@@ -118,8 +166,13 @@ def validate(root):
                     raise ValueError(f"Missing OpenCC config in {path.name}: {node}")
     def check_files(node):
         if isinstance(node, dict):
-            if "file" in node and not (root / "opencc" / node["file"]).is_file():
-                raise ValueError(f"Missing OpenCC dictionary: {node['file']}")
+            if "file" in node:
+                dictionary = root / "opencc" / node["file"]
+                if not dictionary.is_file():
+                    source = dictionary.with_suffix(".txt")
+                    if not (allow_release_sources and node.get("type") == "ocd2"
+                            and source.is_file()):
+                        raise ValueError(f"Missing OpenCC dictionary: {node['file']}")
             for value in node.values():
                 check_files(value)
         elif isinstance(node, list):
@@ -140,19 +193,19 @@ def build(args):
     if not (lmdg / "dicts_hant/zi.dict.yaml").is_file():
         raise ValueError("Official dicts_hant is missing")
     root.mkdir(parents=True)
-    # The workflow supplies wanxiang-base; copy its root scheme/data files only.
+    # 工作流程提供 wanxiang-base；只複製其根目錄下的方案與資料檔。
     for path in source.iterdir():
         if path.name.endswith(".custom.yaml"):
             continue
         if path.is_file() and (path.suffix in {".yaml", ".txt"} or path.name == "LICENSE"):
             shutil.copy2(path, root / path.name)
-    # Explicit directory allowlist: never include upstream's plum installer.
+    # 明確限制可複製的目錄，絕不包含上游的 plum 安裝程式。
     for folder in ("lua", "opencc", "custom"):
         shutil.copytree(source / folder, root / folder)
     for name in ("wanxiang_s2t.json", "wanxiang_s2hk.json", "wanxiang_s2tw.json"):
         (root / "opencc" / name).unlink(missing_ok=True)
     shutil.copytree(lmdg / "dicts_hant", root / "dicts")
-    # Prefer official Hant dictionaries; convert missing tables from the scheme.
+    # 優先採用官方繁體詞典；缺少的詞表再由方案轉換產生。
     for path in (source / "dicts").glob("*.dict.yaml"):
         target = root / "dicts" / path.name
         if not target.exists():
@@ -169,8 +222,6 @@ def build(args):
     write(fish, read(fish).replace("蝨目魚", "虱目魚"))
 
     cc = root / "opencc/wanxiang"
-    upstream_text_tables = {path.name for path in cc.glob("*.txt")}
-    upstream_compiled_tables = {path.name for path in cc.glob("*.ocd2")}
     supply_opencc_dictionaries(args.opencc_source, cc)
     variants = cc / "TWVariants.txt"
     changes = custom / "修改TWVariants.txt"
@@ -182,7 +233,7 @@ def build(args):
         counts = Counter(lines)
         write(variants, "\n".join(s for s in lines if counts[s] == 1) + "\n")
 
-    # Derive the missing Traditional-to-Simplified table from upstream phrase pairs.
+    # 從上游詞組配對推導缺少的繁轉簡詞表。
     ts_phrases = cc / "Custom_TSPhrases.txt"
     if not ts_phrases.is_file():
         reverse_phrases = {}
@@ -197,22 +248,18 @@ def build(args):
         write(ts_phrases, "\n".join(key + "\t" + " ".join(values)
                                     for key, values in reverse_phrases.items()) + "\n")
 
-    # Use the maintained custom configs verbatim instead of generating JSON.
-    for name in ("wanxiang_t2s.json", "wanxiang_t2hk.json", "wanxiang_t2tw.json"):
-        shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
-
-    # Decode the upstream emoji dictionary for editing; restore its format below.
+    # 解開上游 emoji 詞典以便編輯，稍後再處理其輸出格式。
     emoji = cc / "emoji.txt"
     compiled_emoji = emoji.with_suffix(".ocd2")
     if compiled_emoji.is_file():
         subprocess.run(["opencc_dict", "-i", str(compiled_emoji), "-o", str(emoji),
                         "-f", "ocd2", "-t", "text"], check=True)
-    # Upstream may ship only text; convert it before adding user-defined aliases.
+    # 上游也可能只提供文字檔；加入使用者自訂別名之前先完成轉換。
     lines = convert(read(emoji), "s2t.json").splitlines()
     emoji_additions = custom / "emoji新增.txt"
     if emoji_additions.is_file():
         lines.extend(read(emoji_additions).splitlines())
-    # Different Simplified keys can become the same Traditional key.
+    # 不同的簡體鍵值可能轉換成相同的繁體鍵值。
     mapping = {}
     for line in lines:
         if not line or line.startswith("#"):
@@ -223,52 +270,11 @@ def build(args):
             if value and value not in bucket:
                 bucket.append(value)
     write(emoji, "\n".join(k + "\t" + " ".join(v) for k, v in mapping.items()) + "\n")
-    # Preserve upstream formats. Only rebuild existing binary dictionaries whose
-    # text was edited. Resolve missing binaries to text without compiling it.
-    resolve_opencc_formats(root)
-    referenced_text_tables = set()
-    def collect_text_tables(node):
-        if isinstance(node, dict):
-            if node.get("type") == "text" and "file" in node:
-                referenced_text_tables.add(node["file"])
-            for value in node.values():
-                collect_text_tables(value)
-        elif isinstance(node, list):
-            for value in node:
-                collect_text_tables(value)
-    for config_path in (root / "opencc").glob("*.json"):
-        collect_text_tables(json.loads(read(config_path)))
-    for path in cc.glob("*.txt"):
-        compiled = path.with_suffix(".ocd2")
-        if compiled.name not in upstream_compiled_tables:
-            continue
-        if path.name not in {"emoji.txt", "TWVariants.txt"}:
-            continue
-        if path.name == "TWVariants.txt" and not changes.is_file():
-            continue
-        # Legacy Lua custom tables used tabs between alternatives; OpenCC uses spaces.
-        normalized = []
-        for line in read(path).splitlines():
-            # Ubuntu's OpenCC 1.1 compiler rejects comments and blank lines.
-            if not line.strip() or line.lstrip().startswith("#"):
-                continue
-            if "\t" in line:
-                key, values = line.split("\t", 1)
-                line = key + "\t" + values.replace("\t", " ")
-            normalized.append(line)
-        write(path, "\n".join(normalized) + "\n")
-        compiled.unlink(missing_ok=True)
-        subprocess.run(["opencc_dict", "-i", str(path), "-o", str(compiled),
-                        "-f", "text", "-t", "ocd2"], check=True)
-        # Some versions report dictionary errors while returning exit status 0.
-        if not compiled.is_file() or compiled.stat().st_size == 0:
-            raise ValueError(f"OpenCC did not compile dictionary: {path}")
-        if (path.name not in upstream_text_tables
-                and path.relative_to(root / "opencc").as_posix() not in referenced_text_tables):
-            path.unlink()
-    for filename in ("Custom_STPhrases.txt", "Custom_STPhrases.ocd2",
-                     "STPhrases.txt", "STPhrases.ocd2", "STCharacters.txt", "STCharacters.ocd2"):
-        (cc / filename).unlink(missing_ok=True)
+    # 倉庫比照上游原始碼配置，只保留文字檔；Release 打包時才編譯
+    # 暫存副本，並改寫該副本內的 JSON 引用。
+    prepare_source_opencc(root)
+    # 三個繁轉設定以 custom_configs/opencc 為唯一來源；原樣複製後不再改寫。
+    copy_custom_opencc_configs(custom, root)
 
     for name in ("chinese_english", "english_chinese", "others", "tips_show", "sentence"):
         path = root / "lua/data" / (name + ".txt")
@@ -296,7 +302,7 @@ def build(args):
     if emoji_additions.is_file():
         build_info["emoji_additions"] = hashlib.sha256(read(emoji_additions).encode("utf-8")).hexdigest()
     write(root / "build-info.json", json.dumps(build_info, indent=2) + "\n")
-    validate(root)
+    validate(root, allow_release_sources=True)
     if args.gram:
         if not args.gram.is_file() or args.gram.stat().st_size == 0:
             raise ValueError("Traditional language model is missing or empty")
@@ -305,11 +311,16 @@ def build(args):
         if not args.gram:
             raise ValueError("Both release packages require a validated language model")
         args.archives.mkdir(parents=True, exist_ok=True)
-        for kind in ("base", "full"):
-            with zipfile.ZipFile(args.archives / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-                for path in sorted(root.rglob("*")):
-                    if path.is_file() and path.name != "build-info.json" and not (kind == "base" and path.suffix == ".gram"):
-                        archive.write(path, path.relative_to(root))
+        with tempfile.TemporaryDirectory() as folder:
+            release_root = Path(folder) / "hant"
+            shutil.copytree(root, release_root)
+            prepare_release_opencc(release_root)
+            validate(release_root)
+            for kind in ("base", "full"):
+                with zipfile.ZipFile(args.archives / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+                    for path in sorted(release_root.rglob("*")):
+                        if path.is_file() and path.name != "build-info.json" and not (kind == "base" and path.suffix == ".gram"):
+                            archive.write(path, path.relative_to(release_root))
     print("Traditional build and dependency checks passed:", root)
 
 

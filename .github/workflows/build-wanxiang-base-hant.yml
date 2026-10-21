@@ -2,6 +2,13 @@ name: Build wanxiang-base-hant
 
 on:
   workflow_dispatch: {}
+  push:
+    paths:
+      - '.github/scripts/build_hant.py'
+      - '.github/scripts/test_opencc_formats.py'
+      - '.github/workflows/build-wanxiang-base-hant.yml'
+      - 'custom_configs/opencc/**'
+      - 'custom_configs/修改TWVariants.txt'
   schedule:
     - cron: '0 0 * * *'
 
@@ -32,7 +39,9 @@ jobs:
             exit 0
           fi
 
-          if [[ ! -f build-info.json ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif [[ ! -f build-info.json ]]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             recorded_scheme=$(python3 -c 'import json; print(json.load(open("build-info.json"))["scheme"])')
@@ -107,20 +116,26 @@ jobs:
           import os
           from pathlib import Path
           import runpy
+          import shutil
           import zipfile
 
           root = Path(os.environ["RUNNER_TEMP"]) / "hant"
-          runpy.run_path(".github/scripts/build_hant.py")["validate"](root)
+          helpers = runpy.run_path(".github/scripts/build_hant.py")
+          helpers["validate"](root, allow_release_sources=True)
           gram = root / "wanxiang-lts-zh-hant.gram"
           if not gram.is_file() or gram.stat().st_size == 0:
               raise ValueError("Traditional language model is missing or empty")
+          release_root = Path(os.environ["RUNNER_TEMP"]) / "release-hant"
+          shutil.copytree(root, release_root)
+          helpers["prepare_release_opencc"](release_root)
+          helpers["validate"](release_root)
           packages = Path(os.environ["RUNNER_TEMP"]) / "packages"
           packages.mkdir(parents=True, exist_ok=True)
           for kind in ("base", "full"):
               with zipfile.ZipFile(packages / f"rime-wanxiang-{kind}.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-                  for path in sorted(root.rglob("*")):
+                  for path in sorted(release_root.rglob("*")):
                       if path.is_file() and path.name != "build-info.json" and not (kind == "base" and path.suffix == ".gram"):
-                          archive.write(path, path.relative_to(root))
+                          archive.write(path, path.relative_to(release_root))
           PY
 
       - name: Save generated source
