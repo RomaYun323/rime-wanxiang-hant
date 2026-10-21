@@ -1,0 +1,16 @@
+# Rime dictionary
+# encoding: utf-8
+
+---
+name: contacts
+version: "2026.08.23"
+sort: by_weight
+use_preset_vocabulary: false
+
+# 提供單字拼音，讓 Rime 自動為純文字姓名編碼
+import_tables:
+  - dicts/zi
+...
+# 全名
+
+# 兩個字

@@ -64,7 +64,7 @@ jobs:
           if ! git rev-parse --verify --quiet refs/tags/custom-configs; then
             echo "configs=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet custom-configs HEAD -- \
-            custom_configs/patches/wanxiang.custom.yaml custom_configs/patches/default.custom.yaml; then
+            custom_configs/patches/; then
             echo "configs=false" >> "$GITHUB_OUTPUT"
           else
             echo "configs=true" >> "$GITHUB_OUTPUT"
@@ -207,8 +207,13 @@ jobs:
           name: 萬象輸入法繁體方案補丁
           make_latest: false
           body: |
-            - `wanxiang.custom.yaml`：繁體方案補丁
+            **必裝**
+
+            - `wanxiang.custom.yaml`：繁體方案補丁，啟用繁體方案所需
             - `default.custom.yaml`：全域選項保存設定
+
+            **選用**
+
+            - 其餘 YAML 檔案依個人需求選擇安裝
           files: |
-            custom_configs/patches/wanxiang.custom.yaml
-            custom_configs/patches/default.custom.yaml
+            custom_configs/patches/*

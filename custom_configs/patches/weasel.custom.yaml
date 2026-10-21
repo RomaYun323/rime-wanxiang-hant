@@ -1,0 +1,8 @@
+# Weasel custom settings
+# encoding: utf-8
+
+patch:
+  "style/horizontal": false
+  "style/candidate_abbreviate_length": 0
+  "style/layout/min_width": 130
+  "style/layout/max_width": 0
