@@ -134,6 +134,13 @@ def copy_custom_opencc_configs(custom, root):
         shutil.copy2(custom / "opencc" / name, root / "opencc" / name)
 
 
+def remove_upstream_st_dictionaries(root):
+    """移除輸出方案不使用的上游簡轉繁詞典。"""
+    dictionary_root = root / "opencc/wanxiang"
+    for name in ("Custom_STPhrases.txt", "STCharacters.txt", "STPhrases.txt"):
+        (dictionary_root / name).unlink(missing_ok=True)
+
+
 def validate(root, allow_release_sources=False):
     for path in root.glob("*.dict.yaml"):
         for table in yaml_header(path).get("import_tables", []):
@@ -212,7 +219,7 @@ def build(args):
             convert_dictionary(path, target)
     convert_dictionary(source / "custom_phrase.dict.yaml", root / "custom_phrase.dict.yaml")
     custom = args.custom
-    additions = custom / "zi.dict.新增部分.yaml"
+    additions = custom / "overrides/zi.dict.新增部分.yaml"
     if additions.is_file():
         zi = root / "dicts/zi.dict.yaml"
         write(zi, read(zi).rstrip() + "\n" + read(additions).strip() + "\n")
@@ -224,7 +231,7 @@ def build(args):
     cc = root / "opencc/wanxiang"
     supply_opencc_dictionaries(args.opencc_source, cc)
     variants = cc / "TWVariants.txt"
-    changes = custom / "修改TWVariants.txt"
+    changes = custom / "overrides/修改TWVariants.txt"
     if changes.is_file():
         if not variants.is_file():
             subprocess.run(["opencc_dict", "-i", str(variants.with_suffix(".ocd2")),
@@ -256,7 +263,7 @@ def build(args):
                         "-f", "ocd2", "-t", "text"], check=True)
     # 上游也可能只提供文字檔；加入使用者自訂別名之前先完成轉換。
     lines = convert(read(emoji), "s2t.json").splitlines()
-    emoji_additions = custom / "emoji新增.txt"
+    emoji_additions = custom / "overrides/emoji新增.txt"
     if emoji_additions.is_file():
         lines.extend(read(emoji_additions).splitlines())
     # 不同的簡體鍵值可能轉換成相同的繁體鍵值。
@@ -273,6 +280,7 @@ def build(args):
     # 倉庫比照上游原始碼配置，只保留文字檔；Release 打包時才編譯
     # 暫存副本，並改寫該副本內的 JSON 引用。
     prepare_source_opencc(root)
+    remove_upstream_st_dictionaries(root)
     # 三個繁轉設定以 custom_configs/opencc 為唯一來源；原樣複製後不再改寫。
     copy_custom_opencc_configs(custom, root)
 

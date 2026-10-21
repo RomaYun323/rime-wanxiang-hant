@@ -3,10 +3,9 @@ patch:
   switches/@7/options: [t2t, t2s, t2hk, t2tw]
   switches/@7/states: [通繁, 简体, 港繁, 臺繁]
   switches/@7/reset: 3
-  # switches/@6/reset: 2
-  engine/filters/@6: simplifier@t2s
-  engine/filters/@7: simplifier@t2hk
-  engine/filters/@8: simplifier@t2tw
+  engine/filters/@7: simplifier@t2s
+  engine/filters/@8: simplifier@t2hk
+  engine/filters/@9: simplifier@t2tw
   charset_filter/@0/base: T
   charset_filter/@1/base: jg
   charset_filter/@1/option: t2s
@@ -23,8 +22,16 @@ patch:
     - y/m/d I:M p
   key_binder/bindings/@4/toggle: t2s
   key_binder/bindings/@5/toggle: t2s
-  key_binder/bindings/@4/toggle: t2s
-  key_binder/bindings/@5/toggle: t2s
+  key_binder/bindings/+:
+    - when: has_menu
+      accept: semicolon
+      send: 2
+    - when: paging
+      accept: comma
+      send: Page_Up
+    - when: has_menu
+      accept: period
+      send: Page_Down
   super_replacer/chain: false
   s2t:
   s2hk:
@@ -46,19 +53,12 @@ patch:
     opencc_config: wanxiang_t2tw.json
     tips: none
     tags: [abc]
+
   speller/algebra:
     __patch:
       - wanxiang_algebra:/base/小鹤双拼
-  key_binder/bindings/+:
-    - when: paging
-      accept: comma
-      send: Page_Up
-    - when: has_menu
-      accept: period
-      send: Page_Down
-    - when: has_menu
-      accept: semicolon
-      send: 2
+
 #  translator/packs: [contacts]
-#  custom_phrase/dictionary: my_phrase
+#  custom_phrase/dictionary: wanxiang_phrase_my
 #  punctuator/symbols/+:
+    # '/xx':

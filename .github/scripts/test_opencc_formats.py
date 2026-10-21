@@ -6,7 +6,8 @@ import unittest
 from unittest.mock import patch
 
 from build_hant import (copy_custom_opencc_configs, prepare_release_opencc,
-                        prepare_source_opencc, read, validate, write)
+                        prepare_source_opencc, read, remove_upstream_st_dictionaries,
+                        validate, write)
 
 
 class OpenCCFormatTests(unittest.TestCase):
@@ -112,6 +113,20 @@ class OpenCCFormatTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Missing OpenCC dictionary"):
             validate(self.root)
+
+    def test_unused_upstream_st_dictionaries_are_removed(self):
+        dictionary_root = self.root / "opencc/wanxiang"
+        removed = ("Custom_STPhrases.txt", "STCharacters.txt", "STPhrases.txt")
+        retained = ("Custom_TSPhrases.txt", "TSCharacters.txt", "TSPhrases.txt")
+        for name in removed + retained:
+            write(dictionary_root / name, name + "\n")
+
+        remove_upstream_st_dictionaries(self.root)
+
+        for name in removed:
+            self.assertFalse((dictionary_root / name).exists())
+        for name in retained:
+            self.assertTrue((dictionary_root / name).is_file())
 
 
 if __name__ == "__main__":

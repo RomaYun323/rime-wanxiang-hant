@@ -8,7 +8,8 @@ on:
       - '.github/scripts/test_opencc_formats.py'
       - '.github/workflows/build-wanxiang-base-hant.yml'
       - 'custom_configs/opencc/**'
-      - 'custom_configs/修改TWVariants.txt'
+      - 'custom_configs/patches/**'
+      - 'custom_configs/overrides/**'
   schedule:
     - cron: '0 0 * * *'
 
@@ -50,8 +51,8 @@ jobs:
             latest_scheme=$(git ls-remote https://github.com/amzxyz/rime-wanxiang.git refs/heads/wanxiang-base | cut -f1)
             latest_dicts=$(git ls-remote https://github.com/amzxyz/RIME-LMDG.git refs/heads/wanxiang | cut -f1)
             latest_emoji=""
-            if [[ -f custom_configs/emoji新增.txt ]]; then
-              latest_emoji=$(sha256sum custom_configs/emoji新增.txt | cut -d' ' -f1)
+            if [[ -f custom_configs/overrides/emoji新增.txt ]]; then
+              latest_emoji=$(sha256sum custom_configs/overrides/emoji新增.txt | cut -d' ' -f1)
             fi
             if [[ "$recorded_scheme" == "$latest_scheme" && "$recorded_dicts" == "$latest_dicts" && "$recorded_emoji" == "$latest_emoji" ]]; then
               echo "build=false" >> "$GITHUB_OUTPUT"
@@ -63,7 +64,7 @@ jobs:
           if ! git rev-parse --verify --quiet refs/tags/custom-configs; then
             echo "configs=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet custom-configs HEAD -- \
-            custom_configs/wanxiang.custom.yaml custom_configs/default.custom.yaml; then
+            custom_configs/patches/wanxiang.custom.yaml custom_configs/patches/default.custom.yaml; then
             echo "configs=false" >> "$GITHUB_OUTPUT"
           else
             echo "configs=true" >> "$GITHUB_OUTPUT"
@@ -209,5 +210,5 @@ jobs:
             - `wanxiang.custom.yaml`：繁體方案補丁
             - `default.custom.yaml`：全域選項保存設定
           files: |
-            custom_configs/wanxiang.custom.yaml
-            custom_configs/default.custom.yaml
+            custom_configs/patches/wanxiang.custom.yaml
+            custom_configs/patches/default.custom.yaml
