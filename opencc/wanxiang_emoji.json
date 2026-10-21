@@ -1,6 +1,5 @@
 {
   "name": "Emoji",
-
   "segmentation": {
     "type": "mmseg",
     "dict": {
@@ -11,13 +10,12 @@
           "file": "wanxiang/Custom_Emoji.txt"
         },
         {
-          "type": "ocd2",
-          "file": "wanxiang/emoji.ocd2"
+          "type": "text",
+          "file": "wanxiang/emoji.txt"
         }
       ]
     }
   },
-
   "conversion_chain": [
     {
       "dict": {
@@ -28,8 +26,8 @@
             "file": "wanxiang/Custom_Emoji.txt"
           },
           {
-            "type": "ocd2",
-            "file": "wanxiang/emoji.ocd2"
+            "type": "text",
+            "file": "wanxiang/emoji.txt"
           }
         ]
       }

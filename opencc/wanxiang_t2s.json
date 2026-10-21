@@ -1,5 +1,6 @@
 {
   "name": "Traditional Chinese to Simplified Chinese",
+
   "segmentation": {
     "type": "mmseg",
     "dict": {
@@ -10,8 +11,8 @@
           "file": "wanxiang/Custom_TSPhrases.txt"
         },
         {
-          "type": "text",
-          "file": "wanxiang/TSPhrases.txt"
+          "type": "ocd2",
+          "file": "wanxiang/TSPhrases.ocd2"
         }
       ]
     }
@@ -26,12 +27,12 @@
             "file": "wanxiang/Custom_TSPhrases.txt"
           },
           {
-            "type": "text",
-            "file": "wanxiang/TSPhrases.txt"
+            "type": "ocd2",
+            "file": "wanxiang/TSPhrases.ocd2"
           },
           {
-            "type": "text",
-            "file": "wanxiang/TSCharacters.txt"
+            "type": "ocd2",
+            "file": "wanxiang/TSCharacters.ocd2"
           }
         ]
       }
