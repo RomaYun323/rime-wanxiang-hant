@@ -25841,15 +25841,15 @@ freckly	雀斑的
 fred	弗雷德
 freddie	弗雷迪
 freddy	弗雷迪
-frederic	弗雷德裏克
-frederick	弗雷德裏克
-fredericks	弗雷德裏克斯
-fredericksburg	弗雷德裏克斯堡
+frederic	弗雷德里克
+frederick	弗雷德里克
+fredericks	弗雷德里克斯
+fredericksburg	弗雷德里克斯堡
 frederico	弗雷德里科
-fredericton	弗雷德裏克頓
+fredericton	弗雷德里克頓
 fredholm	弗雷德霍姆
-fredrick	弗雷德裏克
-fredrickson	弗雷德裏克森
+fredrick	弗雷德里克
+fredrickson	弗雷德里克森
 free	自由
 freebies	贈品
 freeboard	幹舷
@@ -37098,7 +37098,7 @@ liven	活躍
 liveness	活躍度
 live photos	實況照片
 liver	肝臟
-livereload	實時重載
+livereload	即時重載
 liveried	穿制服的
 liverish	肝火旺的
 livermore	利弗莫爾
@@ -39912,7 +39912,7 @@ midday	正午
 midden	垃圾堆
 middle	中間
 middleaged	中年
-middlebury	米德爾伯裏
+middlebury	米德爾伯里
 middleman	中間人
 middlemen	中間人
 middles	中間
@@ -51510,7 +51510,7 @@ realms	領域
 realness	真實
 reals	實數
 realskin	真皮
-realtime	實時
+realtime	即時
 realtor	經紀人
 realtors	經紀人
 realty	房地產
@@ -68413,7 +68413,7 @@ vixenish	潑辣的
 viz	即
 vizier	維齊爾
 vladimir	弗拉基米爾
-vladivostok	符拉迪沃斯託克
+vladivostok	符拉迪沃斯托克
 vlan	虛擬局域網
 virtual local area network	虛擬局域網
 vlc	vlc播放器
@@ -69152,7 +69152,7 @@ webmasters	網站管理員
 webp	網頁圖片
 webpack	網頁打包
 webpage	網頁
-webrtc	網頁實時
+webrtc	網頁即時
 webs	網絡
 webshots	網頁快照
 website	網站
