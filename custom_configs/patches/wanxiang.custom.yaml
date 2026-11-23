@@ -59,6 +59,7 @@ patch:
       - wanxiang_algebra:/base/小鹤双拼
 
 #  translator/packs: [contacts]
+#  translator/dictionary: wanxianguser
 #  custom_phrase/dictionary: wanxiang_phrase_my
 #  punctuator/symbols/+:
     # '/xx':
